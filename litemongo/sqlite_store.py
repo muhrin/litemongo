@@ -223,7 +223,10 @@ class TableDict(collections.abc.MutableMapping):
 
     def __delitem__(self, key):
         key = self._encode_key(key)
-        res = self._cur.execute(f"DELETE FROM {self._table_name} WHERE {self.ID}='{key}'")  # nosec
+        with self._connection:
+            res = self._cur.execute(
+                f"DELETE FROM {self._table_name} WHERE {self.ID}='{key}'"  # nosec
+            )
         if res.rowcount <= 0:
             raise KeyError(key)
 

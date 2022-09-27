@@ -13,7 +13,7 @@ import mongomock.store
 
 from . import stores
 
-__all__ = "MongoClient", "StoreType"
+__all__ = "MongoClient", "StoreType", "connect"
 
 
 class StoreType:
@@ -55,13 +55,44 @@ def create_store(spec: Union[stores.ServerStore, str]) -> stores.ServerStore:
 
 
 class MongoClient(mongomock.MongoClient):
-    def __init__(self, store: Union[stores.ServerStore, str] = None, **kwargs):
-        super().__init__(_store=create_store(store), **kwargs)
+    def __init__(
+        self,
+        store: stores.ServerStore,
+        database: str = "",
+        document_class=dict,
+        tz_aware=False,
+        read_preference=None,
+    ):
+        uri = f"mongodb://localhost/{database}"
+        super().__init__(
+            host=uri,
+            document_class=document_class,
+            tz_aware=tz_aware,
+            read_preference=read_preference,
+            _store=create_store(store),
+        )
 
     def close(self):
         super().close()
         # Make sure to close the store
         self._store.close()
+
+
+def connect(
+    path: str,
+    document_class=dict,
+    tz_aware=False,
+    read_preference=None,
+) -> MongoClient:
+    parsed = parse.urlparse(path)
+    database = parsed.fragment
+    return MongoClient(
+        create_store(path),
+        database=database,
+        document_class=document_class,
+        tz_aware=tz_aware,
+        read_preference=read_preference,
+    )
 
 
 class Collection(mongomock.Collection):
