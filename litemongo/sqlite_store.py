@@ -1,7 +1,7 @@
 import collections.abc
 import pathlib
 import sqlite3
-from typing import Iterator, Union
+from typing import Iterator, Union, MutableMapping
 
 import bson
 import bson.json_util
@@ -46,7 +46,7 @@ class DatabaseStore(mongomock.store.DatabaseStore):
 
     def __init__(self, path: pathlib.Path):
         self._dirpath = path.absolute()
-        self._collections = {}
+        self._collections : MutableMapping[str, CollectionStore] = {}
 
         if self._dirpath.exists():
             if not self._dirpath.is_dir():
@@ -121,30 +121,22 @@ class CollectionStore(mongomock.store.CollectionStore):
 
     def rename(self, new_name: str):
         self.close()
-        self._path = self._path.rename(self._path.parent / new_name)
+        new_path =self._path.parent / new_name
+        self._path.rename(new_path)
+        self._path = new_path
         self.open()
 
     def drop(self):
         self.close()
-        self._path.unlink(missing_ok=True)
+        try:
+            self._path.unlink()
+        except FileNotFoundError:
+            pass
 
         self._ttl_indexes.clear()
         self._is_force_created = False
 
         self.open()
-
-    def create_index(self, index_name: str, index_dict: dict):
-        self.indexes[index_name] = index_dict
-        if index_dict.get('expireAfterSeconds') is not None:
-            self._ttl_indexes[index_name] = index_dict
-
-    def drop_index(self, index_name: str):
-        self._remove_expired_documents()
-
-        # The main index object should raise a KeyError, but the
-        # TTL indexes have no meaning to the outside.
-        del self.indexes[index_name]
-        self._ttl_indexes.pop(index_name, None)
 
     def open(self):
         self._connection = sqlite3.connect(self._path)
