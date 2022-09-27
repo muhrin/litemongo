@@ -11,21 +11,26 @@ import mongomock.thread
 
 from . import stores
 
-__all__ = 'ServerStore', 'DatabaseStore', 'CollectionStore'
+__all__ = "ServerStore", "DatabaseStore", "CollectionStore"
 
 
 class ServerStore(stores.ServerStore):
-    def __init__(self, dirpath: str):
+    def __init__(self, dirpath: Union[str, pathlib.Path] = ""):
+        """
+        Create a new server store
+
+        :param dirpath: the directory where the database folders will be stored, defaults to current directory
+        """
         self._dirpath = pathlib.Path(dirpath).absolute()
         self._databases = {}
 
         if self._dirpath.exists():
             if not self._dirpath.is_dir():
-                raise ValueError(f'Path exists but is not a directory: {self._dirpath}')
+                raise ValueError(f"Path exists but is not a directory: {self._dirpath}")
         else:
             self._dirpath.mkdir(parents=True)
 
-    def __getitem__(self, db_name) -> 'DatabaseStore':
+    def __getitem__(self, db_name) -> "DatabaseStore":
         if db_name not in self._databases:
             self._databases[db_name] = DatabaseStore(self._dirpath / db_name)
 
@@ -46,15 +51,15 @@ class DatabaseStore(mongomock.store.DatabaseStore):
 
     def __init__(self, path: pathlib.Path):
         self._dirpath = path.absolute()
-        self._collections : MutableMapping[str, CollectionStore] = {}
+        self._collections: MutableMapping[str, CollectionStore] = {}
 
         if self._dirpath.exists():
             if not self._dirpath.is_dir():
-                raise ValueError(f'Path exists but is not a directory: {self._dirpath}')
+                raise ValueError(f"Path exists but is not a directory: {self._dirpath}")
         else:
             self._dirpath.mkdir(parents=True)
 
-    def __getitem__(self, col_name) -> 'CollectionStore':
+    def __getitem__(self, col_name) -> "CollectionStore":
         if col_name not in self._collections:
             self._collections[col_name] = CollectionStore(self._dirpath / col_name)
 
@@ -87,11 +92,11 @@ class DatabaseStore(mongomock.store.DatabaseStore):
 class CollectionStore(mongomock.store.CollectionStore):
     """Object holding the data for a collection."""
 
-    DOCUMENTS = 'documents'
-    INDEXES = 'indexes'
+    DOCUMENTS = "documents"
+    INDEXES = "indexes"
 
-    ID = '_id'
-    DOC = 'doc'
+    ID = "_id"
+    DOC = "doc"
 
     _documents = None
     indexes = None
@@ -121,7 +126,7 @@ class CollectionStore(mongomock.store.CollectionStore):
 
     def rename(self, new_name: str):
         self.close()
-        new_path =self._path.parent / new_name
+        new_path = self._path.parent / new_name
         self._path.rename(new_path)
         self._path = new_path
         self.open()
@@ -154,15 +159,10 @@ class CollectionStore(mongomock.store.CollectionStore):
 
 
 class TableDict(collections.abc.MutableMapping):
-    ID = '_id'
-    DOC = 'doc'
+    ID = "_id"
+    DOC = "doc"
 
-    def __init__(
-            self,
-            table_name: str,
-            connection: sqlite3.Connection,
-            cursor: sqlite3.Cursor
-    ):
+    def __init__(self, table_name: str, connection: sqlite3.Connection, cursor: sqlite3.Cursor):
         self._table_name = table_name
         self._connection = connection
         self._cur = cursor
@@ -182,7 +182,7 @@ class TableDict(collections.abc.MutableMapping):
             self._connection.commit()
 
     def __len__(self) -> int:
-        res = self._cur.execute(f"select count(*) from {self._table_name}")
+        res = self._cur.execute(f"select count(*) from {self._table_name}")  # nosec
         counts = res.fetchone()
         return counts[0]
 
@@ -201,7 +201,9 @@ class TableDict(collections.abc.MutableMapping):
 
     def __getitem__(self, key: str):
         key = self._encode_key(key)
-        res = self._cur.execute(f"SELECT {self.DOC} from {self._table_name} where {self.ID}='{key}'")
+        res = self._cur.execute(
+            f"SELECT {self.DOC} from {self._table_name} where {self.ID}='{key}'"
+        )
         value = res.fetchone()
         if value is None:
             raise KeyError(key)
@@ -214,13 +216,14 @@ class TableDict(collections.abc.MutableMapping):
         data = (key, val, val)
         with self._connection:
             self._cur.execute(
-                f"INSERT INTO {self._table_name} VALUES(?, ?)"
-                f"ON CONFLICT({self.ID}) DO UPDATE SET {self.DOC}=?", data
+                f"INSERT INTO {self._table_name} VALUES(?, ?)"  # nosec
+                f"ON CONFLICT({self.ID}) DO UPDATE SET {self.DOC}=?",  # nosec
+                data,
             )
 
     def __delitem__(self, key):
         key = self._encode_key(key)
-        res = self._cur.execute(f"DELETE FROM {self._table_name} WHERE {self.ID}='{key}'")
+        res = self._cur.execute(f"DELETE FROM {self._table_name} WHERE {self.ID}='{key}'")  # nosec
         if res.rowcount <= 0:
             raise KeyError(key)
 
@@ -265,5 +268,5 @@ class IndexDict(TableDict):
     def _decode_doc(self, dataset) -> dict:
         index_dict = super()._decode_doc(dataset)
         # Convert list of index keys to tuples as they should be
-        index_dict['key'] = list(map(tuple, index_dict['key']))
+        index_dict["key"] = list(map(tuple, index_dict["key"]))
         return index_dict
