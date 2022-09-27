@@ -1,0 +1,30 @@
+include:
+  template: Dependency-Scanning.gitlab-ci.yml
+
+image: python:3.6-buster
+
+# This folder is cached between builds
+# http://docs.gitlab.com/ce/ci/yaml/README.html#cache
+cache:
+  paths:
+    - "$CI_PROJECT_DIR/pip-cache"
+  key: "$CI_PROJECT_ID"
+
+before_script:
+  - apt update -y && apt upgrade -y
+  - export DEBIAN_FRONTEND=noninteractive
+  - ln -fs /usr/share/zoneinfo/Africa/Lusaka /etc/localtime
+  - dpkg-reconfigure --frontend noninteractive tzdata
+  - export LC_ALL=C.UTF-8
+  - export LANG=C.UTF-8
+  - which pip3 # for debugging
+  - python3 -V # Print out python version for debugging
+  - which python
+  - pip3 install virtualenv
+  - virtualenv ../venv
+  - source ../venv/bin/activate
+  - pip install -r requirements.txt
+
+test:
+  script:
+    - pytest -v --cov=.
