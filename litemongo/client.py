@@ -63,6 +63,7 @@ class MongoClient(mongomock.MongoClient):
         tz_aware=False,
         read_preference=None,
     ):
+        # Create a URI string with the (optional) default database
         uri = f"mongodb://localhost/{database}"
         super().__init__(
             host=uri,
@@ -71,6 +72,12 @@ class MongoClient(mongomock.MongoClient):
             read_preference=read_preference,
             _store=create_store(store),
         )
+
+    def __enter__(self) -> "MongoClient":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
 
     def close(self):
         super().close()
@@ -84,6 +91,8 @@ def connect(
     tz_aware=False,
     read_preference=None,
 ) -> MongoClient:
+    """Convenience function to build a MongoClient.  This will create a server store based on the
+    passed path string"""
     parsed = parse.urlparse(path)
     database = parsed.fragment
     return MongoClient(
