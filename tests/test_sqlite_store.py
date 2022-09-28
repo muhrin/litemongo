@@ -21,8 +21,8 @@ import uuid
 import warnings
 
 import litemongo
-import mongomock
-from mongomock import helpers
+from litemongo._vendor import mongomock
+from litemongo._vendor.mongomock import helpers
 
 try:
     from unittest import mock
@@ -47,10 +47,10 @@ try:
     from pymongo import ReturnDocument
     from pymongo.write_concern import WriteConcern
 except ImportError:
-    from mongomock.collection import ReturnDocument
-    from mongomock import ObjectId
-    from mongomock.read_concern import ReadConcern
-    from mongomock.write_concern import WriteConcern
+    from litemongo._vendor.mongomock.collection import ReturnDocument
+    from litemongo._vendor.mongomock import ObjectId
+    from litemongo._vendor.mongomock.read_concern import ReadConcern
+    from litemongo._vendor.mongomock.write_concern import WriteConcern
     from tests.utils import DBRef
 
 warnings.simplefilter("ignore", DeprecationWarning)
@@ -1547,7 +1547,7 @@ class CollectionAPITest(TestCase):
         self.db.collection.insert_one({"value": now + timedelta(seconds=100)})
         self.assertEqual(self.db.collection.count_documents({}), 1)
 
-        with mock.patch("mongomock.utcnow") as mongomock_utcnow:
+        with mock.patch("litemongo._vendor.mongomock.utcnow") as mongomock_utcnow:
             mongomock_utcnow.return_value = now + timedelta(100)
             self.assertEqual(self.db.collection.count_documents({}), 0)
 

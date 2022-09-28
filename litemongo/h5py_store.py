@@ -3,21 +3,21 @@ from typing import Union
 
 import bson
 import h5py
-import mongomock
-import mongomock.store
-import mongomock.thread
+from ._vendor import mongomock
+from ._vendor.mongomock import store as mongomock_store
+from ._vendor.mongomock import thread as mongomock_thread
 import numpy as np
 
 from . import stores
 
-__all__ = 'ServerStore', 'DatabaseStore', 'CollectionStore'
+__all__ = "ServerStore", "DatabaseStore", "CollectionStore"
 
 
 class ServerStore(stores.ServerStore):
     def __init__(self, filename: str, mode="a"):
         self._databases = h5py.File(filename, mode)
 
-    def __getitem__(self, db_name) -> 'DatabaseStore':
+    def __getitem__(self, db_name) -> "DatabaseStore":
         db: h5py.Group = self._databases.require_group(db_name)
         return DatabaseStore(db)
 
@@ -31,14 +31,14 @@ class ServerStore(stores.ServerStore):
         self._databases.close()
 
 
-class DatabaseStore(mongomock.store.DatabaseStore):
+class DatabaseStore(mongomock_store.DatabaseStore):
     """Object holding the data for a database (many collections)."""
 
     def __init__(self, group: h5py.Group):
         self._group = group
         self._collections = {}
 
-    def __getitem__(self, col_name) -> 'CollectionStore':
+    def __getitem__(self, col_name) -> "CollectionStore":
         try:
             return self._collections[col_name]
         except KeyError:
@@ -73,14 +73,15 @@ class DatabaseStore(mongomock.store.DatabaseStore):
         return any(self[coll_name].is_created for coll_name in self._collections)
 
 
-class CollectionStore(mongomock.store.CollectionStore):
+class CollectionStore(mongomock_store.CollectionStore):
     """Object holding the data for a collection."""
-    DOCUMENTS = 'documents'
-    INDEXES = 'indexes'
-    IS_FORCE_CREATED = 'is_force_created'
-    TTL_INDEXES = 'ttl_indexes'
 
-    EMPTY_UTF16 = ''.encode('utf16')
+    DOCUMENTS = "documents"
+    INDEXES = "indexes"
+    IS_FORCE_CREATED = "is_force_created"
+    TTL_INDEXES = "ttl_indexes"
+
+    EMPTY_UTF16 = "".encode("utf16")
 
     def __init__(self, group: h5py.Group):
         self._group = group
@@ -99,7 +100,7 @@ class CollectionStore(mongomock.store.CollectionStore):
         self.indexes = IndexDict(group.require_group(self.INDEXES))
         self._ttl_indexes = GroupDict(group.require_group(self.TTL_INDEXES))
 
-        self._rwlock = mongomock.thread.RWLock()
+        self._rwlock = mongomock_thread.RWLock()
 
     @property
     def _is_force_created(self) -> bool:
@@ -124,7 +125,7 @@ class CollectionStore(mongomock.store.CollectionStore):
 
     def create_index(self, index_name: str, index_dict: dict):
         self.indexes[index_name] = index_dict
-        if index_dict.get('expireAfterSeconds') is not None:
+        if index_dict.get("expireAfterSeconds") is not None:
             self._ttl_indexes[index_name] = index_dict
 
     def drop_index(self, index_name: str):
@@ -148,7 +149,7 @@ class CollectionStore(mongomock.store.CollectionStore):
         super().__delitem__(self._encode_key(key))
 
     def _encode_key(self, key) -> Union[str, bytes]:
-        if key == '':
+        if key == "":
             return self.EMPTY_UTF16
 
         return str(key)
@@ -184,7 +185,7 @@ class GroupDict(collections.abc.MutableMapping):
         try:
             ds = self._group[key]
         except KeyError:
-            dt = h5py.vlen_dtype(np.dtype('uint8'))
+            dt = h5py.vlen_dtype(np.dtype("uint8"))
             ds = self._group.create_dataset(key, shape=(), dtype=dt)
 
         ds[()] = value
@@ -194,7 +195,7 @@ class GroupDict(collections.abc.MutableMapping):
 
     def _encode_doc(self, doc: dict):
         encoded = bson.encode(doc)
-        return np.frombuffer(encoded, dtype='uint8')
+        return np.frombuffer(encoded, dtype="uint8")
 
     def _decode_doc(self, dataset) -> dict:
         encoded = dataset[()].tobytes()
@@ -211,5 +212,5 @@ class IndexDict(GroupDict):
     def _decode_doc(self, dataset) -> dict:
         index_dict = super()._decode_doc(dataset)
         # Convert list of index keys to tuples as they should be
-        index_dict['key'] = list(map(tuple, index_dict['key']))
+        index_dict["key"] = list(map(tuple, index_dict["key"]))
         return index_dict

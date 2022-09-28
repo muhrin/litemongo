@@ -5,9 +5,9 @@ from typing import Iterator, Union, MutableMapping
 
 import bson
 import bson.json_util
-import mongomock
-import mongomock.store
-import mongomock.thread
+from ._vendor import mongomock
+from ._vendor.mongomock import store as mongomock_store
+from ._vendor.mongomock import thread as mongomock_thread
 
 from . import stores
 
@@ -46,7 +46,7 @@ class ServerStore(stores.ServerStore):
         pass
 
 
-class DatabaseStore(mongomock.store.DatabaseStore):
+class DatabaseStore(mongomock_store.DatabaseStore):
     """Object holding the data for a database (many collections)."""
 
     def __init__(self, path: pathlib.Path):
@@ -89,7 +89,7 @@ class DatabaseStore(mongomock.store.DatabaseStore):
         return any(self[coll_name].is_created for coll_name in self._collections)
 
 
-class CollectionStore(mongomock.store.CollectionStore):
+class CollectionStore(mongomock_store.CollectionStore):
     """Object holding the data for a collection."""
 
     DOCUMENTS = "documents"
@@ -107,7 +107,7 @@ class CollectionStore(mongomock.store.CollectionStore):
         self._ttl_indexes = {}
 
         self.open()
-        self._rwlock = mongomock.thread.RWLock()
+        self._rwlock = mongomock_thread.RWLock()
 
     def create(self):
         self._is_force_created = True

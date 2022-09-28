@@ -1,11 +1,12 @@
 import abc
 
-import mongomock.store
-
-__all__ = ('ServerStore',)
+from ._vendor.mongomock import store as mongomock_store
 
 
-class ServerStore(mongomock.store.ServerStore, metaclass=abc.ABCMeta):
+__all__ = ("ServerStore",)
+
+
+class ServerStore(mongomock_store.ServerStore, metaclass=abc.ABCMeta):
     """MongoMock ServerStore with some additional functionality"""
 
     @abc.abstractmethod

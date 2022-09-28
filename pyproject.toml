@@ -25,7 +25,7 @@ classifiers = [
 keywords = ["mongodb", "database", "sqlite", "disk-based"]
 requires-python = ">=3.7"
 dependencies = [
-    "mongomock @ git+https://github.com/muhrin/mongomock.git@extended-serverstore-support",
+#    "mongomock @ git+https://github.com/muhrin/mongomock.git@extended-serverstore-support",
     "pymongo",
     "setuptools",
 ]
@@ -66,4 +66,4 @@ exclude = '''
 [tool.commitizen]
 tag_format = "v$major.$minor.$patch"
 [tool.bandit]
-exclude_dirs = ["tests"]
+exclude_dirs = ["tests", "litemongo/_vendor"]
