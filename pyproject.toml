@@ -28,6 +28,10 @@ dependencies = [
 #    "mongomock @ git+https://github.com/muhrin/mongomock.git@extended-serverstore-support",
     "pymongo",
     "setuptools",
+    # needed by mongomock:
+    "packaging",
+    "pytz",
+    "sentinels",
 ]
 [project.optional-dependencies]
 dev = [

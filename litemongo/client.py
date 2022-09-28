@@ -1,16 +1,7 @@
-import copy
-import itertools
-import math
 from urllib import parse
-from typing import Iterable, Union
+from typing import Union
 
-from litemongo._vendor import mongomock
-
-# import mongomock.collection
-# import mongomock.filtering
-# import mongomock.helpers
-# import mongomock.not_implemented
-# import mongomock.store
+from ._vendor import mongomock
 
 from . import stores
 
@@ -50,7 +41,9 @@ def create_store(spec: Union[stores.ServerStore, str]) -> stores.ServerStore:
 
             return sqlite_store.ServerStore(uri.path)
         if store_type == StoreType.MEMORY:
-            return mongomock.store.ServerStore()
+            from ._vendor.mongomock import store as mongomock_store
+
+            return mongomock_store.ServerStore()
 
     raise TypeError(f"Unexpected server store specification: {spec}")
 
