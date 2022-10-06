@@ -1,7 +1,7 @@
 from unittest import mock
 
-from mongomock import Database as MongoMockDatabase, Collection as MongoMockCollection
-from mongomock.collection import Cursor as MongoMockCursor
+from . import Database as MongoMockDatabase, Collection as MongoMockCollection
+from .collection import Cursor as MongoMockCursor
 
 try:
     from pymongo.collection import Collection as PyMongoCollection
