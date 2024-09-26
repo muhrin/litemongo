@@ -1,6 +1,7 @@
 """Backend that uses HPF5"""
 
 import collections.abc
+import pathlib
 from typing import Union
 
 import bson
@@ -15,9 +16,9 @@ __all__ = "ServerStore", "DatabaseStore", "CollectionStore"
 
 
 class ServerStore(stores.ServerStore):
-    def __init__(self, filename: str, mode="a"):
+    def __init__(self, filename: Union[str, pathlib.Path], mode="a"):
         super().__init__()
-        self._databases = h5py.File(filename, mode)
+        self._databases = h5py.File(str(filename), mode)
 
     def __getitem__(self, db_name) -> "DatabaseStore":
         db: h5py.Group = self._databases.require_group(db_name)

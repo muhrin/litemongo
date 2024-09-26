@@ -1,6 +1,7 @@
 """Backend that uses pytables for storage"""
 
 import collections.abc
+import pathlib
 from typing import Union
 
 import bson
@@ -15,9 +16,9 @@ __all__ = "ServerStore", "DatabaseStore", "CollectionStore"
 
 
 class ServerStore(stores.ServerStore):
-    def __init__(self, filename: str, mode="a"):
+    def __init__(self, filename: Union[str, pathlib.Path], mode="a"):
         super().__init__()
-        self._databases = tables.open_file(filename, mode)
+        self._databases = tables.open_file(str(filename), mode)
 
     def __getitem__(self, db_name) -> "DatabaseStore":
         db: tables.Group = _require_group(self._databases, self._databases.root, db_name)

@@ -1,5 +1,6 @@
 """Definition of MongoClient and methods to create one"""
 
+import pathlib
 from typing import Union
 from urllib import parse
 
@@ -29,19 +30,22 @@ def create_store(spec: Union[stores.ServerStore, str]) -> stores.ServerStore:
         if uri.query:
             qs_parsed = parse.parse_qs(uri.query)
             store_type = qs_parsed.pop("engine", store_type)
+            if len(store_type) != 1:
+                raise ValueError(f"engine must contain a single entry, got {store_type}")
+            store_type = store_type[0]
 
         if store_type == StoreType.H5PY:
             from . import h5py_store
 
-            return h5py_store.ServerStore(uri.path)
+            return h5py_store.ServerStore(_parse_path(uri))
         if store_type == StoreType.PYTABLES:
             from . import pytables_store
 
-            return pytables_store.ServerStore(uri.path)
+            return pytables_store.ServerStore(_parse_path(uri))
         if store_type == StoreType.SQLITE:
             from . import sqlite_store
 
-            return sqlite_store.ServerStore(uri.path)
+            return sqlite_store.ServerStore(_parse_path(uri))
         if store_type == StoreType.MEMORY:
             from ._vendor.mongomock import store as mongomock_store
 
@@ -99,3 +103,7 @@ def connect(
         tz_aware=tz_aware,
         read_preference=read_preference,
     )
+
+
+def _parse_path(uri: parse.ParseResult) -> pathlib.Path:
+    return pathlib.Path(uri.netloc) / pathlib.Path(uri.path)
