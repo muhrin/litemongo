@@ -2,7 +2,6 @@ import abc
 
 from ._vendor.mongomock import store as mongomock_store
 
-
 __all__ = ("ServerStore",)
 
 

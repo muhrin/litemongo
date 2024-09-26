@@ -1,20 +1,22 @@
+"""Backend that uses pytables for storage"""
+
 import collections.abc
 from typing import Union
 
 import bson
-from ._vendor import mongomock
-from ._vendor.mongomock import store as mongomock_store
-from ._vendor.mongomock import thread as mongomock_thread
 import tables
 import tables.nodes.filenode
 
 from . import stores
+from ._vendor.mongomock import store as mongomock_store
+from ._vendor.mongomock import thread as mongomock_thread
 
 __all__ = "ServerStore", "DatabaseStore", "CollectionStore"
 
 
 class ServerStore(stores.ServerStore):
     def __init__(self, filename: str, mode="a"):
+        super().__init__()
         self._databases = tables.open_file(filename, mode)
 
     def __getitem__(self, db_name) -> "DatabaseStore":
@@ -35,6 +37,7 @@ class DatabaseStore(mongomock_store.DatabaseStore):
     """Object holding the data for a database (many collections)."""
 
     def __init__(self, file: tables.File, group: tables.Group):
+        super().__init__()
         self._file = file
         self._group = group
         self._collections = {}
@@ -62,7 +65,9 @@ class DatabaseStore(mongomock_store.DatabaseStore):
         return col
 
     def rename(self, name: str, new_name: str):
-        self._file.get_node(self._group, name)._f_move(newname=new_name, overwrite=True)
+        self._file.get_node(self._group, name)._f_move(  # pylint: disable=protected-access
+            newname=new_name, overwrite=True
+        )
         self._collections[new_name] = self._collections.pop(name)
 
     @property
@@ -81,6 +86,7 @@ class CollectionStore(mongomock_store.CollectionStore):
     EMPTY_UTF16 = " "
 
     def __init__(self, file: tables.File, group: tables.Group):
+        # pylint: disable=super-init-not-called
         self._file = file
         self._group = group
 
@@ -155,7 +161,8 @@ class CollectionStore(mongomock_store.CollectionStore):
 class GroupDict(collections.abc.MutableMapping):
     """Object that stores MongoDB documents in a HDF5 group
 
-    Storage of MongoDB documents is done as a BSON.encoded uint8 variable length array, using the trick discussed here:
+    Storage of MongoDB documents is done as a BSON.encoded uint8 variable length array, using the
+    trick discussed here:
     https://github.com/mila-iqia/fuel/issues/360#issuecomment-237890510
     """
 
@@ -174,7 +181,7 @@ class GroupDict(collections.abc.MutableMapping):
         try:
             return self._decode_doc(self._group._f_get_child(key))
         except tables.NoSuchNodeError:
-            raise KeyError(key)
+            raise KeyError(key) from None
 
     def __iter__(self):
         return self._group._v_children.keys().__iter__()
@@ -198,7 +205,7 @@ class GroupDict(collections.abc.MutableMapping):
         try:
             self._file.remove_node(self._group, key)
         except tables.NoSuchNodeError:
-            raise KeyError(key)
+            raise KeyError(key) from None
 
     def _encode_doc(self, doc: dict):
         return bson.encode(doc)
@@ -212,8 +219,9 @@ class GroupDict(collections.abc.MutableMapping):
 class IndexDict(GroupDict):
     """Specialised group dictionary that stores MongoDB index information.
 
-    This is necessary because index key specifications are given as tuples while BSON which is used to store
-    the index dictionary converts these to lists.  Here we intercept decoding and convert back to tuples.
+    This is necessary because index key specifications are given as tuples while BSON which is used
+    to store the index dictionary converts these to lists.  Here we intercept decoding and convert
+    back to tuples.
     """
 
     def _decode_doc(self, dataset) -> dict:

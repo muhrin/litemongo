@@ -1,15 +1,14 @@
 import collections.abc
 import pathlib
 import sqlite3
-from typing import Iterator, Union, MutableMapping
+from typing import Iterator, MutableMapping, Union
 
 import bson
 import bson.json_util
-from ._vendor import mongomock
-from ._vendor.mongomock import store as mongomock_store
-from ._vendor.mongomock import thread as mongomock_thread
 
 from . import stores
+from ._vendor.mongomock import store as mongomock_store
+from ._vendor.mongomock import thread as mongomock_thread
 
 __all__ = "ServerStore", "DatabaseStore", "CollectionStore"
 
@@ -19,8 +18,10 @@ class ServerStore(stores.ServerStore):
         """
         Create a new server store
 
-        :param dirpath: the directory where the database folders will be stored, defaults to current directory
+        :param dirpath: the directory where the database folders will be stored, defaults to
+            current directory
         """
+        super().__init__()
         self._dirpath = pathlib.Path(dirpath).absolute()
         self._databases = {}
 
@@ -50,6 +51,7 @@ class DatabaseStore(mongomock_store.DatabaseStore):
     """Object holding the data for a database (many collections)."""
 
     def __init__(self, path: pathlib.Path):
+        # pylint: disable=super-init-not-called
         self._dirpath = path.absolute()
         self._collections: MutableMapping[str, CollectionStore] = {}
 
@@ -100,8 +102,11 @@ class CollectionStore(mongomock_store.CollectionStore):
 
     _documents = None
     indexes = None
+    _connection = None
+    _cur = None
 
     def __init__(self, filename: pathlib.Path):
+        # pylint: disable=super-init-not-called
         self._path = filename.absolute()
         self._is_force_created = False
         self._ttl_indexes = {}
@@ -264,12 +269,13 @@ class TableDict(collections.abc.MutableMapping):
 class IndexDict(TableDict):
     """Specialised group dictionary that stores MongoDB index information.
 
-    This is necessary because index key specifications are given as tuples while BSON which is used to store
-    the index dictionary converts these to lists.  Here we intercept decoding and convert back to tuples.
+    This is necessary because index key specifications are given as tuples while BSON which is used
+    to store the index dictionary converts these to lists.  Here we intercept decoding and convert
+    back to tuples.
     """
 
-    def _decode_doc(self, dataset) -> dict:
-        index_dict = super()._decode_doc(dataset)
+    def _decode_doc(self, encoded) -> dict:
+        index_dict = super()._decode_doc(encoded)
         # Convert list of index keys to tuples as they should be
         index_dict["key"] = list(map(tuple, index_dict["key"]))
         return index_dict

@@ -1,9 +1,10 @@
-from urllib import parse
-from typing import Union
+"""Definition of MongoClient and methods to create one"""
 
-from ._vendor import mongomock
+from typing import Union
+from urllib import parse
 
 from . import stores
+from ._vendor import mongomock
 
 __all__ = "MongoClient", "StoreType", "connect"
 
@@ -17,6 +18,7 @@ class StoreType:
 
 def create_store(spec: Union[stores.ServerStore, str]) -> stores.ServerStore:
     """Server store factory"""
+    # pylint: disable=import-outside-toplevel
     if isinstance(spec, stores.ServerStore):
         return spec
 
@@ -49,6 +51,7 @@ def create_store(spec: Union[stores.ServerStore, str]) -> stores.ServerStore:
 
 
 class MongoClient(mongomock.MongoClient):
+    # pylint: disable=abstract-method
     def __init__(
         self,
         store: stores.ServerStore,

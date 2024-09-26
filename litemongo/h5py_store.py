@@ -1,20 +1,22 @@
+"""Backend that uses HPF5"""
+
 import collections.abc
 from typing import Union
 
 import bson
 import h5py
-from ._vendor import mongomock
-from ._vendor.mongomock import store as mongomock_store
-from ._vendor.mongomock import thread as mongomock_thread
 import numpy as np
 
 from . import stores
+from ._vendor.mongomock import store as mongomock_store
+from ._vendor.mongomock import thread as mongomock_thread
 
 __all__ = "ServerStore", "DatabaseStore", "CollectionStore"
 
 
 class ServerStore(stores.ServerStore):
     def __init__(self, filename: str, mode="a"):
+        super().__init__()
         self._databases = h5py.File(filename, mode)
 
     def __getitem__(self, db_name) -> "DatabaseStore":
@@ -35,8 +37,8 @@ class DatabaseStore(mongomock_store.DatabaseStore):
     """Object holding the data for a database (many collections)."""
 
     def __init__(self, group: h5py.Group):
+        super().__init__()
         self._group = group
-        self._collections = {}
 
     def __getitem__(self, col_name) -> "CollectionStore":
         try:
@@ -84,6 +86,7 @@ class CollectionStore(mongomock_store.CollectionStore):
     EMPTY_UTF16 = "".encode("utf16")
 
     def __init__(self, group: h5py.Group):
+        # pylint: disable=super-init-not-called
         self._group = group
 
         try:
@@ -158,7 +161,8 @@ class CollectionStore(mongomock_store.CollectionStore):
 class GroupDict(collections.abc.MutableMapping):
     """Object that stores MongoDB documents in a HDF5 group
 
-    Storage of MongoDB documents is done as a BSON.encoded uint8 variable length array, using the trick discussed here:
+    Storage of MongoDB documents is done as a BSON.encoded uint8 variable length array, using the
+    trick discussed here:
     https://github.com/mila-iqia/fuel/issues/360#issuecomment-237890510
     """
 
@@ -205,8 +209,9 @@ class GroupDict(collections.abc.MutableMapping):
 class IndexDict(GroupDict):
     """Specialised group dictionary that stores MongoDB index information.
 
-    This is necessary because index key specifications are given as tuples while BSON which is used to store
-    the index dictionary converts these to lists.  Here we intercept decoding and convert back to tuples.
+    This is necessary because index key specifications are given as tuples while BSON which is used
+    to store the index dictionary converts these to lists.  Here we intercept decoding and convert
+    back to tuples.
     """
 
     def _decode_doc(self, dataset) -> dict:

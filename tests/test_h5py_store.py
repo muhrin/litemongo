@@ -4,28 +4,30 @@ https://github.com/mongomock/mongomock/blob/develop/tests/test__collection_api.p
 
 The copyright belongs to them, here it is used under BSD license.
 """
-import collections.abc
+
 import collections
+import collections.abc
 import copy
-from datetime import datetime, tzinfo, timedelta
+from datetime import datetime, timedelta, tzinfo
 import os
-from packaging import version
 import platform
 import random
 import re
 import sys
 import tempfile
-from tests.diff import diff
 import time
 import unittest
 from unittest import TestCase, skipIf, skipUnless
 import uuid
 import warnings
 
+from packaging import version
+
 import litemongo
-import litemongo.h5py_store
 from litemongo._vendor import mongomock
 from litemongo._vendor.mongomock import helpers
+import litemongo.h5py_store
+from tests.diff import diff
 
 try:
     import h5py
@@ -45,18 +47,17 @@ except ImportError:
         _HAVE_MOCK = False
 
 try:
-    from bson import codec_options
+    from bson import DBRef, ObjectId, Regex, Timestamp, codec_options, decimal128, tz_util
     from bson.errors import InvalidDocument
-    from bson import tz_util, ObjectId, Regex, decimal128, Timestamp, DBRef
     import pymongo
+    from pymongo import ReturnDocument
     from pymongo.collation import Collation
     from pymongo.read_concern import ReadConcern
     from pymongo.read_preferences import ReadPreference
-    from pymongo import ReturnDocument
     from pymongo.write_concern import WriteConcern
 except ImportError:
-    from litemongo._vendor.mongomock.collection import ReturnDocument
     from litemongo._vendor.mongomock import ObjectId
+    from litemongo._vendor.mongomock.collection import ReturnDocument
     from litemongo._vendor.mongomock.read_concern import ReadConcern
     from litemongo._vendor.mongomock.write_concern import WriteConcern
     from tests.utils import DBRef
