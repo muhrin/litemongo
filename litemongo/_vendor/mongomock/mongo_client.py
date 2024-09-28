@@ -12,36 +12,26 @@ import warnings
 try:
     from pymongo.uri_parser import parse_uri, split_hosts
     from pymongo import ReadPreference
-
     _READ_PREFERENCE_PRIMARY = ReadPreference.PRIMARY
 except ImportError:
     from .helpers import parse_uri, split_hosts
-
     _READ_PREFERENCE_PRIMARY = read_preferences.PRIMARY
 
 
 def _convert_version_to_list(version_str):
-    pieces = [int(part) for part in version_str.split(".")]
+    pieces = [int(part) for part in version_str.split('.')]
     return pieces + [0] * (4 - len(pieces))
 
 
-class MongoClient(object):
+class MongoClient:
 
-    HOST = "localhost"
+    HOST = 'localhost'
     PORT = 27017
     _CONNECTION_ID = itertools.count()
 
-    def __init__(
-        self,
-        host=None,
-        port=None,
-        document_class=dict,
-        tz_aware=False,
-        connect=True,
-        _store=None,
-        read_preference=None,
-        **kwargs,
-    ):
+    def __init__(self, host=None, port=None, document_class=dict,
+                 tz_aware=False, connect=True, _store=None, read_preference=None,
+                 **kwargs):
         if host:
             self.host = host[0] if isinstance(host, (list, tuple)) else host
         else:
@@ -55,15 +45,15 @@ class MongoClient(object):
         self._id = next(self._CONNECTION_ID)
         self._document_class = document_class
         if read_preference is not None:
-            read_preferences.ensure_read_preference_type("read_preference", read_preference)
+            read_preferences.ensure_read_preference_type('read_preference', read_preference)
         self._read_preference = read_preference or _READ_PREFERENCE_PRIMARY
 
         dbase = None
 
-        if "://" in self.host:
+        if '://' in self.host:
             res = parse_uri(self.host, default_port=self.port, warn=True)
-            self.host, self.port = res["nodelist"][0]
-            dbase = res["database"]
+            self.host, self.port = res['nodelist'][0]
+            dbase = res['database']
         else:
             self.host, self.port = split_hosts(self.host, default_port=self.port)[0]
 
@@ -84,15 +74,14 @@ class MongoClient(object):
         self.close()
 
     def __repr__(self):
-        return "mongomock.MongoClient('{0}', {1})".format(self.host, self.port)
+        return f"mongomock.MongoClient('{self.host}', {self.port})"
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.address == other.address
         return NotImplemented
 
-    if helpers.PYMONGO_VERSION >= version.parse("3.12"):
-
+    if helpers.PYMONGO_VERSION >= version.parse('3.12'):
         def __hash__(self):
             return hash(self.address)
 
@@ -121,25 +110,25 @@ class MongoClient(object):
 
     def server_info(self):
         return {
-            "version": self._server_version,
-            "sysInfo": "Mock",
-            "versionArray": _convert_version_to_list(self._server_version),
-            "bits": 64,
-            "debug": False,
-            "maxBsonObjectSize": 16777216,
-            "ok": 1,
+            'version': self._server_version,
+            'sysInfo': 'Mock',
+            'versionArray': _convert_version_to_list(self._server_version),
+            'bits': 64,
+            'debug': False,
+            'maxBsonObjectSize': 16777216,
+            'ok': 1
         }
 
-    if helpers.PYMONGO_VERSION < version.parse("4.0"):
-
+    if helpers.PYMONGO_VERSION < version.parse('4.0'):
         def database_names(self):
-            warnings.warn("database_names is deprecated. Use list_database_names instead.")
+            warnings.warn('database_names is deprecated. Use list_database_names instead.')
             return self.list_database_names()
 
     def list_database_names(self):
         return self._store.list_created_database_names()
 
     def drop_database(self, name_or_db):
+
         def drop_collections_for_db(_db):
             db_store = self._store[_db.name]
             for col_name in db_store.list_created_collection_names():
@@ -154,14 +143,8 @@ class MongoClient(object):
             db = self.get_database(name_or_db)
             drop_collections_for_db(db)
 
-    def get_database(
-        self,
-        name=None,
-        codec_options=None,
-        read_preference=None,
-        write_concern=None,
-        read_concern=None,
-    ):
+    def get_database(self, name=None, codec_options=None, read_preference=None,
+                     write_concern=None, read_concern=None):
         if name is None:
             db = self.get_default_database(
                 codec_options=codec_options,
@@ -174,20 +157,16 @@ class MongoClient(object):
         if db is None:
             db_store = self._store[name]
             db = self._database_accesses[name] = Database(
-                self,
-                name,
-                read_preference=read_preference or self.read_preference,
-                codec_options=codec_options or self._codec_options,
-                _store=db_store,
-                read_concern=read_concern,
-            )
+                self, name, read_preference=read_preference or self.read_preference,
+                codec_options=codec_options or self._codec_options, _store=db_store,
+                read_concern=read_concern)
         return db
 
     def get_default_database(self, default=None, **kwargs):
         name = self.__default_database_name
         name = name if name is not None else default
         if name is None:
-            raise ConfigurationError("No default database name defined or provided.")
+            raise ConfigurationError('No default database name defined or provided.')
 
         return self.get_database(name=name, **kwargs)
 
@@ -200,4 +179,4 @@ class MongoClient(object):
 
     def start_session(self, causal_consistency=True, default_transaction_options=None):
         """Start a logical session."""
-        raise NotImplementedError("Mongomock does not support sessions yet")
+        raise NotImplementedError('Mongomock does not support sessions yet')

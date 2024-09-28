@@ -1,3 +1,1 @@
-import pkg_resources
-
-__version__ = "4.1.2b"
+__version__ = "4.2.0.post2.dev10+g33ff326"

@@ -2,20 +2,19 @@
 
 
 _IGNORED_FEATURES = {
-    "array_filters": False,
-    "collation": False,
-    "let": False,
-    "session": False,
+    'array_filters': False,
+    'collation': False,
+    'let': False,
+    'session': False,
 }
 
 
 def _ensure_ignorable_feature(feature):
     if feature not in _IGNORED_FEATURES:
         raise KeyError(
-            "%s is not an error that can be ignored: maybe it has been implemented in Mongomock. "
-            "Here is the list of features that can be ignored: %s"
-            % (feature, _IGNORED_FEATURES.keys())
-        )
+            '%s is not an error that can be ignored: maybe it has been implemented in Mongomock. '
+            'Here is the list of features that can be ignored: %s' % (
+                feature, _IGNORED_FEATURES.keys()))
 
 
 def ignore_feature(feature):

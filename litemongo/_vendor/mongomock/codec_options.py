@@ -1,6 +1,7 @@
 """Tools for specifying BSON codec options."""
 
 import collections
+
 from packaging import version
 
 from . import helpers
@@ -11,7 +12,7 @@ except ImportError:
     codec_options = None
 
 
-class TypeRegistry(object):
+class TypeRegistry:
     pass
 
 
@@ -25,9 +26,15 @@ _FIELDS = (
 
 if codec_options and helpers.PYMONGO_VERSION >= version.parse("3.8"):
     _DEFAULT_TYPE_REGISTRY = codec_options.TypeRegistry()
-    _FIELDS = _FIELDS + ("type_registry",)
+    _FIELDS += ("type_registry",)
 else:
     _DEFAULT_TYPE_REGISTRY = TypeRegistry()
+
+if codec_options and helpers.PYMONGO_VERSION >= version.parse("4.3"):
+    _DEFAULT_DATETIME_CONVERSION = codec_options.DatetimeConversion.DATETIME
+    _FIELDS += ("datetime_conversion",)
+else:
+    _DEFAULT_DATETIME_CONVERSION = 1
 
 # New default in Pymongo v4:
 # https://pymongo.readthedocs.io/en/stable/examples/uuid.html#unspecified
@@ -42,31 +49,27 @@ class CodecOptions(collections.namedtuple("CodecOptions", _FIELDS)):
         cls,
         document_class=dict,
         tz_aware=False,
-        uuid_representation=None,
+        uuid_representation=_DEFAULT_UUID_REPRESENTATION,
         unicode_decode_error_handler="strict",
         tzinfo=None,
-        type_registry=None,
+        type_registry=_DEFAULT_TYPE_REGISTRY,
+        datetime_conversion=_DEFAULT_DATETIME_CONVERSION,
     ):
-
         if document_class != dict:
             raise NotImplementedError(
-                "Mongomock does not implement custom document_class yet: %r" % document_class
-            )
+                'Mongomock does not implement custom document_class yet: %r' % document_class)
 
         if not isinstance(tz_aware, bool):
-            raise TypeError("tz_aware must be True or False")
+            raise TypeError('tz_aware must be True or False')
 
-        if uuid_representation is None:
-            uuid_representation = _DEFAULT_UUID_REPRESENTATION
         if uuid_representation != _DEFAULT_UUID_REPRESENTATION:
-            raise NotImplementedError("Mongomock does not handle custom uuid_representation yet")
+            raise NotImplementedError('Mongomock does not handle custom uuid_representation yet')
 
-        if unicode_decode_error_handler not in ("strict", None):
+        if unicode_decode_error_handler not in ('strict', None):
             raise NotImplementedError(
-                "Mongomock does not handle custom unicode_decode_error_handler yet"
-            )
+                'Mongomock does not handle custom unicode_decode_error_handler yet')
 
-        if tzinfo:
+        if tzinfo is not None:
             raise NotImplementedError("Mongomock does not handle custom tzinfo yet")
 
         values = (
@@ -78,13 +81,22 @@ class CodecOptions(collections.namedtuple("CodecOptions", _FIELDS)):
         )
 
         if "type_registry" in _FIELDS:
-            if not type_registry:
-                type_registry = _DEFAULT_TYPE_REGISTRY
-            elif not type_registry == _DEFAULT_TYPE_REGISTRY:
+            type_registry = type_registry or _DEFAULT_TYPE_REGISTRY
+            if type_registry != _DEFAULT_TYPE_REGISTRY:
                 raise NotImplementedError(
-                    "Mongomock does not handle custom type_registry yet %r" % type_registry
+                    "Mongomock does not handle custom type_registry yet %r"
+                    % type_registry
                 )
-            values = values + (type_registry,)
+            values += (type_registry,)
+
+        if "datetime_conversion" in _FIELDS:
+            datetime_conversion = datetime_conversion or _DEFAULT_DATETIME_CONVERSION
+            if datetime_conversion != _DEFAULT_DATETIME_CONVERSION:
+                raise NotImplementedError(
+                    f"Mongomock does not handle custom datetime_conversion "
+                    f"yet {datetime_conversion}"
+                )
+            values += (datetime_conversion,)
 
         return tuple.__new__(cls, values)
 

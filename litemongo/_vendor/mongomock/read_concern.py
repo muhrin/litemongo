@@ -1,13 +1,13 @@
-class ReadConcern(object):
+class ReadConcern:
     def __init__(self, level=None):
         self._document = {}
 
         if level is not None:
-            self._document["level"] = level
+            self._document['level'] = level
 
     @property
     def level(self):
-        return self._document.get("level")
+        return self._document.get('level')
 
     @property
     def ok_for_legacy(self):

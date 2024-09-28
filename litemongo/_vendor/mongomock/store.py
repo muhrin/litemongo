@@ -6,7 +6,7 @@ from .. import mongomock
 from .thread import RWLock
 
 
-class ServerStore(object):
+class ServerStore:
     """Object holding the data for a whole server (many databases)."""
 
     def __init__(self):
@@ -26,7 +26,7 @@ class ServerStore(object):
         return [name for name, db in self._databases.items() if db.is_created]
 
 
-class DatabaseStore(object):
+class DatabaseStore:
     """Object holding the data for a database (many collections)."""
 
     def __init__(self):
@@ -60,7 +60,7 @@ class DatabaseStore(object):
         return any(col.is_created for col in self._collections.values())
 
 
-class CollectionStore(object):
+class CollectionStore:
     """Object holding the data for a collection."""
 
     def __init__(self, name):
@@ -88,7 +88,7 @@ class CollectionStore(object):
 
     def create_index(self, index_name, index_dict):
         self.indexes[index_name] = index_dict
-        if index_dict.get("expireAfterSeconds") is not None:
+        if index_dict.get('expireAfterSeconds') is not None:
             self._ttl_indexes[index_name] = index_dict
 
     def drop_index(self, index_name):
@@ -131,8 +131,7 @@ class CollectionStore(object):
     def documents(self):
         self._remove_expired_documents()
         with self._rwlock.reader():
-            for doc in self._documents.values():
-                yield doc
+            yield from self._documents.values()
 
     def _remove_expired_documents(self):
         for index in self._ttl_indexes.values():
@@ -144,22 +143,21 @@ class CollectionStore(object):
 
         # Ignore non-integer values
         try:
-            expiry = int(index["expireAfterSeconds"])
+            expiry = int(index['expireAfterSeconds'])
         except ValueError:
             return
 
         # Ignore commpound keys
-        if len(index["key"]) > 1:
+        if len(index['key']) > 1:
             return
 
         # "key" structure = list of (field name, direction) tuples
-        ttl_field_name = next(iter(index["key"]))[0]
+        ttl_field_name = next(iter(index['key']))[0]
         ttl_now = mongomock.utcnow()
 
         with self._rwlock.reader():
             expired_ids = [
-                doc["_id"]
-                for doc in self._documents.values()
+                doc['_id'] for doc in self._documents.values()
                 if self._value_meets_expiry(doc.get(ttl_field_name), expiry, ttl_now)
             ]
 

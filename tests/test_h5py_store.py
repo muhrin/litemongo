@@ -23,7 +23,6 @@ import warnings
 
 from packaging import version
 
-import litemongo
 from litemongo._vendor import mongomock
 from litemongo._vendor.mongomock import helpers
 import litemongo.h5py_store
@@ -5844,7 +5843,12 @@ class CollectionAPITest(TestCase):
         collection = self.db.collection
         with self.assertRaises(InvalidDocument) as cm:
             collection.insert_one({"$foo": "bar"})
-        self.assertEqual(str(cm.exception), "key '$foo' must not start with '$'")
+        self.assertEqual(
+            str(cm.exception),
+            'Top-level field names cannot start with the "$"' " sign (found: $foo)",
+        )
+        with self.assertRaises(InvalidDocument):
+            collection.insert_one({"foo": {"foo\0bar": "bar"}})
 
     @skipIf(not helpers.HAVE_PYMONGO, "pymongo not installed")
     def test__update_invalid_encode_type(self):

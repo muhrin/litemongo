@@ -1,7 +1,8 @@
-class _Primary(object):
+class _Primary:
+
     @property
     def mongos_mode(self):
-        return "primary"
+        return 'primary'
 
     @property
     def mode(self):
@@ -9,11 +10,11 @@ class _Primary(object):
 
     @property
     def name(self):
-        return "Primary"
+        return 'Primary'
 
     @property
     def document(self):
-        return {"mode": "primary"}
+        return {'mode': 'primary'}
 
     @property
     def tag_sets(self):
@@ -30,11 +31,10 @@ class _Primary(object):
 
 def ensure_read_preference_type(key, value):
     """Raise a TypeError if the value is not a type compatible for ReadPreference."""
-    for attr in ("document", "mode", "mongos_mode", "max_staleness"):
+    for attr in ('document', 'mode', 'mongos_mode', 'max_staleness'):
         if not hasattr(value, attr):
-            raise TypeError(
-                "{} must be an instance of {}".format(key, "pymongo.read_preference.ReadPreference")
-            )
+            raise TypeError('{} must be an instance of {}'.format(
+                key, 'pymongo.read_preference.ReadPreference'))
 
 
 PRIMARY = _Primary()
