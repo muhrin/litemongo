@@ -17,6 +17,8 @@ repos:
       - id: black
         exclude:
           (?x)^(
+          docs/.*|
+          tests/.*|
           litemongo/_vendor/.*
           )$
 
@@ -29,7 +31,13 @@ repos:
     rev: '6.0.1'
     hooks:
       - id: isort
-        exclude: litemongo/_vendor/.*
+        exclude:
+          (?x)^(
+          docs/.*|
+          tests/.*|
+          litemongo/_vendor/.*
+          )$
+
 
   - repo: https://github.com/PyCQA/bandit
     rev: 1.8.3
