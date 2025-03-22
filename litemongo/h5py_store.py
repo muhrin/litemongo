@@ -84,7 +84,7 @@ class CollectionStore(mongomock_store.CollectionStore):
     IS_FORCE_CREATED = "is_force_created"
     TTL_INDEXES = "ttl_indexes"
 
-    EMPTY_UTF16 = "".encode("utf16")
+    EMPTY_KEY = "_empty"
 
     def __init__(self, group: h5py.Group):
         # pylint: disable=super-init-not-called
@@ -154,7 +154,7 @@ class CollectionStore(mongomock_store.CollectionStore):
 
     def _encode_key(self, key) -> Union[str, bytes]:
         if key == "":
-            return self.EMPTY_UTF16
+            return self.EMPTY_KEY
 
         return str(key)
 

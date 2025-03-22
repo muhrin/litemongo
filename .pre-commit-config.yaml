@@ -2,7 +2,7 @@
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
       - id: check-added-large-files
         args: [ '--maxkb=5000' ]
@@ -12,7 +12,7 @@ repos:
       - id: check-docstring-first
 
   - repo: https://github.com/psf/black
-    rev: 24.8.0
+    rev: 25.1.0
     hooks:
       - id: black
         exclude:
@@ -21,25 +21,25 @@ repos:
           )$
 
   - repo: https://github.com/pycqa/flake8
-    rev: 7.1.1
+    rev: 7.1.2
     hooks:
       - id: flake8
 
   - repo: https://github.com/pycqa/isort
-    rev: '5.13.2'
+    rev: '6.0.1'
     hooks:
       - id: isort
         exclude: litemongo/_vendor/.*
 
   - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.10
+    rev: 1.8.3
     hooks:
       - id: bandit
         args: [ "-c", "pyproject.toml" ]
         additional_dependencies: [ "bandit[toml]" ]
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.29.1
+    rev: v4.4.1
     hooks:
       - id: commitizen
         stages: [ commit-msg ]
@@ -47,7 +47,7 @@ repos:
   - repo: https://github.com/PyCQA/pylint
     # Configuration help can be found here:
     # https://pylint.pycqa.org/en/latest/user_guide/installation/pre-commit-integration.html
-    rev: v3.2.6
+    rev: v3.3.6
     hooks:
       - id: pylint
         alias: pylint-with-spelling

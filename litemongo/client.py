@@ -60,6 +60,7 @@ class MongoClient(mongomock.MongoClient):
         self,
         store: stores.ServerStore,
         database: str = "",
+        *,
         document_class=dict,
         tz_aware=False,
         read_preference=None,
