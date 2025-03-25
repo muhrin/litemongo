@@ -1,12 +1,14 @@
 import collections.abc
 import pathlib
 import sqlite3
-from typing import Iterator, MutableMapping, Union
+from typing import Iterator, Union
 
 import bson
 import bson.json_util
+from packaging import version
 
 from . import stores
+from ._vendor.mongomock import helpers
 from ._vendor.mongomock import store as mongomock_store
 from ._vendor.mongomock import thread as mongomock_thread
 
@@ -50,10 +52,11 @@ class ServerStore(stores.ServerStore):
 class DatabaseStore(mongomock_store.DatabaseStore):
     """Object holding the data for a database (many collections)."""
 
-    def __init__(self, path: pathlib.Path):
+    def __init__(self, path: pathlib.Path, codec_options: bson.CodecOptions = None):
         # pylint: disable=super-init-not-called
         self._dirpath = path.absolute()
-        self._collections: MutableMapping[str, CollectionStore] = {}
+        self._codec_options = codec_options or bson.DEFAULT_CODEC_OPTIONS
+        self._collections: dict[str, CollectionStore] = {}
 
         if self._dirpath.exists():
             if not self._dirpath.is_dir():
@@ -61,9 +64,14 @@ class DatabaseStore(mongomock_store.DatabaseStore):
         else:
             self._dirpath.mkdir(parents=True)
 
+    def set_codec_options(self, codec_options: bson.CodecOptions):
+        self._codec_options = codec_options
+
     def __getitem__(self, col_name) -> "CollectionStore":
         if col_name not in self._collections:
-            self._collections[col_name] = CollectionStore(self._dirpath / col_name)
+            self._collections[col_name] = CollectionStore(
+                self._dirpath / col_name, codec_options=self._codec_options
+            )
 
         return self._collections[col_name]
 
@@ -105,9 +113,10 @@ class CollectionStore(mongomock_store.CollectionStore):
     _connection = None
     _cur = None
 
-    def __init__(self, filename: pathlib.Path):
+    def __init__(self, filename: pathlib.Path, codec_options: bson.CodecOptions = None):
         # pylint: disable=super-init-not-called
         self._path = filename.absolute()
+        self._codec_options = codec_options or bson.DEFAULT_CODEC_OPTIONS
         self._is_force_created = False
         self._ttl_indexes = {}
 
@@ -151,8 +160,12 @@ class CollectionStore(mongomock_store.CollectionStore):
     def open(self):
         self._connection = sqlite3.connect(self._path)
         self._cur = self._connection.cursor()
-        self._documents = TableDict(self.DOCUMENTS, self._connection, self._cur)
-        self.indexes = IndexDict(self.INDEXES, self._connection, self._cur)
+        self._documents = TableDict(
+            self.DOCUMENTS, self._connection, self._cur, codec_options=self._codec_options
+        )
+        self.indexes = IndexDict(
+            self.INDEXES, self._connection, self._cur, codec_options=self._codec_options
+        )
 
     def close(self):
         self._cur.close()
@@ -167,10 +180,17 @@ class TableDict(collections.abc.MutableMapping):
     ID = "_id"
     DOC = "doc"
 
-    def __init__(self, table_name: str, connection: sqlite3.Connection, cursor: sqlite3.Cursor):
+    def __init__(
+        self,
+        table_name: str,
+        connection: sqlite3.Connection,
+        cursor: sqlite3.Cursor,
+        codec_options: bson.CodecOptions = None,
+    ):
         self._table_name = table_name
         self._connection = connection
         self._cur = cursor
+        self._codec_options = codec_options or bson.DEFAULT_CODEC_OPTIONS
         self._init_table()
 
     def _init_table(self):
@@ -217,7 +237,8 @@ class TableDict(collections.abc.MutableMapping):
 
     def __setitem__(self, key, val: dict):
         key = self._encode_key(key)
-        val = self._encode_doc(val)
+        if not isinstance(val, bytes):
+            val = self._encode_doc(val)
         data = (key, val, val)
         with self._connection:
             self._cur.execute(
@@ -254,7 +275,8 @@ class TableDict(collections.abc.MutableMapping):
         :param doc: the document to be encoded
         :return: the encoded version that can be decoded back using _decode_doc()
         """
-        return bson.encode(doc)
+        check_keys = version.parse("3.6") > helpers.PYMONGO_VERSION
+        return bson.encode(doc, check_keys=check_keys, codec_options=self._codec_options)
 
     def _decode_doc(self, encoded: Union[str, bytes]) -> dict:
         """
@@ -263,7 +285,7 @@ class TableDict(collections.abc.MutableMapping):
         :param encoded: the encoded document
         :return: the decoded document dictionary
         """
-        return bson.decode(encoded)
+        return bson.decode(encoded, codec_options=self._codec_options)
 
 
 class IndexDict(TableDict):

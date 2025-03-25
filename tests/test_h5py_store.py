@@ -4410,8 +4410,7 @@ class CollectionAPITest(TestCase):
             },
         ]
         actual = self.db.coll.aggregate(pipeline)
-        self.assertEqual([{"_id": 1, "arr": [2, 3]}], list(actual))
-        # TODO: should be: self.assertEqual([{'_id': 1, 'arr': [2, 3], 'lookup': []}], list(actual))
+        self.assertEqual([{'_id': 1, 'arr': [2, 3], 'lookup': []}], list(actual))
 
     def test__aggregate_sample(self):
         self.db.a.insert_many([{"_id": i} for i in range(5)])

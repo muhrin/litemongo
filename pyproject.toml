@@ -63,7 +63,7 @@ exclude = '''
   | build
   | (.*)/migrations
   | dist
-  | litemongo/_vendor/.*
+  | src/litemongo/_vendor/.*
   | tests/
 )
 '''
@@ -103,4 +103,4 @@ max-parents = 12
 [tool.commitizen]
 tag_format = "v$major.$minor.$patch"
 [tool.bandit]
-exclude_dirs = ["tests", "litemongo/_vendor"]
+exclude_dirs = ["tests", "src/litemongo/_vendor"]

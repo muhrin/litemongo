@@ -5,10 +5,12 @@ import pathlib
 from typing import Union
 
 import bson
+from packaging import version
 import tables
 import tables.nodes.filenode
 
 from . import stores
+from ._vendor.mongomock import helpers
 from ._vendor.mongomock import store as mongomock_store
 from ._vendor.mongomock import thread as mongomock_thread
 
@@ -37,11 +39,17 @@ class ServerStore(stores.ServerStore):
 class DatabaseStore(mongomock_store.DatabaseStore):
     """Object holding the data for a database (many collections)."""
 
-    def __init__(self, file: tables.File, group: tables.Group):
+    def __init__(
+        self, file: tables.File, group: tables.Group, codec_options: bson.CodecOptions = None
+    ):
         super().__init__()
         self._file = file
         self._group = group
+        self._codec_options = codec_options or bson.DEFAULT_CODEC_OPTIONS
         self._collections = {}
+
+    def set_codec_options(self, codec_options: bson.CodecOptions):
+        self._codec_options = codec_options
 
     def __getitem__(self, col_name) -> "CollectionStore":
         try:
@@ -86,10 +94,13 @@ class CollectionStore(mongomock_store.CollectionStore):
 
     EMPTY_UTF16 = " "
 
-    def __init__(self, file: tables.File, group: tables.Group):
+    def __init__(
+        self, file: tables.File, group: tables.Group, codec_options: bson.CodecOptions = None
+    ):
         # pylint: disable=super-init-not-called
         self._file = file
         self._group = group
+        self._codec_options = codec_options
 
         try:
             file.create_array(self._group, self.IS_FORCE_CREATED, obj=False)
@@ -167,9 +178,12 @@ class GroupDict(collections.abc.MutableMapping):
     https://github.com/mila-iqia/fuel/issues/360#issuecomment-237890510
     """
 
-    def __init__(self, file: tables.File, group: tables.Group):
+    def __init__(
+        self, file: tables.File, group: tables.Group, codec_options: bson.CodecOptions = None
+    ):
         self._file = file
         self._group = group
+        self._codec_options = codec_options or bson.DEFAULT_CODEC_OPTIONS
 
     @property
     def group(self) -> tables.Group:
@@ -209,12 +223,13 @@ class GroupDict(collections.abc.MutableMapping):
             raise KeyError(key) from None
 
     def _encode_doc(self, doc: dict):
-        return bson.encode(doc)
+        check_keys = version.parse("3.6") > helpers.PYMONGO_VERSION
+        return bson.encode(doc, check_keys=check_keys, codec_options=self._codec_options)
 
     def _decode_doc(self, dataset: tables.Array) -> dict:
         with tables.nodes.filenode.open_node(dataset, "r") as file:
             encoded = file.read()
-            return bson.decode(encoded)
+            return bson.decode(encoded, codec_options=self._codec_options)
 
 
 class IndexDict(GroupDict):
