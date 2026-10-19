@@ -38,7 +38,7 @@ def _encode_key_legacy(key) -> str:
     return str(key)
 
 
-def _encode_key_typed(key) -> str:  # pylint: disable=too-many-return-statements
+def _encode_key_typed(key) -> str:  # noqa: PLR0911 - one return per type
     """Encode a key so that ids MongoDB considers different get different keys, while ids it
     considers equal (e.g. 1 and 1.0) get the same key"""
     if isinstance(key, str):
@@ -113,7 +113,6 @@ class DatabaseStore(mongomock_store.DatabaseStore):
     """Object holding the data for a database (many collections)."""
 
     def __init__(self, path: pathlib.Path, codec_options: bson.CodecOptions = None):
-        # pylint: disable=super-init-not-called
         self._dirpath = path.absolute()
         self._codec_options = codec_options or bson.DEFAULT_CODEC_OPTIONS
         self._collections: dict[str, CollectionStore] = {}
@@ -194,7 +193,6 @@ class CollectionStore(mongomock_store.CollectionStore):
     _cur = None
 
     def __init__(self, filename: pathlib.Path, codec_options: bson.CodecOptions = None):
-        # pylint: disable=super-init-not-called
         self._path = filename.absolute()
         self._codec_options = codec_options or bson.DEFAULT_CODEC_OPTIONS
         self._is_force_created = False
@@ -241,11 +239,11 @@ class CollectionStore(mongomock_store.CollectionStore):
     def copy_from(self, source: "CollectionStore"):
         """Replace the contents of this collection with those of the source"""
         # The rows are copied as is, so the target has to use the same key format as the source
-        self._documents.key_format = source._documents.key_format  # pylint: disable=protected-access
+        self._documents.key_format = source._documents.key_format
         with self._rwlock.writer(), self._connection:
             for table in (self.DOCUMENTS, self.INDEXES, self.INFO):
                 self._connection.execute(f"DELETE FROM {table}")  # nosec
-                rows = source._connection.execute(  # pylint: disable=protected-access
+                rows = source._connection.execute(
                     f"SELECT * FROM {table} ORDER BY ROWID"  # nosec
                 ).fetchall()
                 if rows:
@@ -253,8 +251,8 @@ class CollectionStore(mongomock_store.CollectionStore):
                     query = f"INSERT INTO {table} VALUES ({placeholders})"  # nosec
                     self._connection.executemany(query, rows)
         self.indexes.invalidate()
-        self._is_force_created = source._is_force_created  # pylint: disable=protected-access
-        self._ttl_indexes = dict(source._ttl_indexes)  # pylint: disable=protected-access
+        self._is_force_created = source._is_force_created
+        self._ttl_indexes = dict(source._ttl_indexes)
         self._query_index = None
 
     def open(self):

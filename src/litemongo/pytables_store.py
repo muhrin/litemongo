@@ -73,9 +73,7 @@ class DatabaseStore(mongomock_store.DatabaseStore):
         return col
 
     def rename(self, name: str, new_name: str):
-        self._file.get_node(self._group, name)._f_move(  # pylint: disable=protected-access
-            newname=new_name, overwrite=True
-        )
+        self._file.get_node(self._group, name)._f_move(newname=new_name, overwrite=True)
         self._collections[new_name] = self._collections.pop(name)
 
     @property
@@ -96,7 +94,6 @@ class CollectionStore(mongomock_store.CollectionStore):
     def __init__(
         self, file: tables.File, group: tables.Group, codec_options: bson.CodecOptions = None
     ):
-        # pylint: disable=super-init-not-called
         self._file = file
         self._group = group
         self._codec_options = codec_options
@@ -250,4 +247,4 @@ def _require_group(file: tables.File, node: tables.Node, name, *args, **kwargs) 
     try:
         return file.get_node(node, name)
     except tables.NoSuchNodeError:
-        return file.create_group(node, name=name, *args, **kwargs)
+        return file.create_group(node, name, *args, **kwargs)

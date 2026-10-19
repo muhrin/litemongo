@@ -305,7 +305,7 @@ def test_sqlite_legacy_key_format(tmp_path):
     assert "v_1" in coll.index_information()
     coll.insert_one({"_id": ObjectId(), "v": 2})
     assert coll.count_documents({}) == 2
-    store = coll.database._store["coll"]  # pylint: disable=protected-access
+    store = coll.database._store["coll"]
     assert store._documents.key_format == sqlite_store.KEY_FORMAT_LEGACY
 
     # Renaming into a new file carries the format across

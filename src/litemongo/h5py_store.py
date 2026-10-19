@@ -101,7 +101,6 @@ class CollectionStore(mongomock_store.CollectionStore):
     EMPTY_KEY = "_empty"
 
     def __init__(self, group: h5py.Group, codec_options=None):
-        # pylint: disable=super-init-not-called
         self._group = group
         self._codec_options = codec_options or bson.DEFAULT_CODEC_OPTIONS
 

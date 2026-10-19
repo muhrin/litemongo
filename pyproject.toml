@@ -43,9 +43,9 @@ backends = [
 dev = [
     "flit",
     "pre-commit",
-    "pylint",
     "pytest",
     "ruff",
+    "ty==0.0.89",  # Pinned as new releases add checks
 ]
 
 [tool.uv]
@@ -60,14 +60,37 @@ extend-exclude = ["src/litemongo/_vendor"]
 exclude = ["docs/**", "tests/**"]
 
 [tool.ruff.lint]
-# Equivalent of the previous flake8 (pyflakes, pycodestyle, mccabe) and isort checks
-select = ["E", "F", "W", "C90", "I"]
-ignore = ["E501", "F401", "F403"]
+select = [
+    "E", "F", "W",  # pycodestyle and pyflakes
+    "C90",  # mccabe complexity
+    "I",  # isort
+    "A",  # shadowing builtins
+    "B",  # bugbear: likely bugs and design problems
+    "PL",  # pylint
+]
+ignore = [
+    "E501",  # line length is handled by the formatter
+    "F401",
+    "F403",
+    "PLC0415",  # imports outside top level are used to avoid circular imports
+    "PLR2004",  # magic value comparisons
+    "PLW1641",  # __eq__ without __hash__ (Python already makes these unhashable)
+]
 
 [tool.ruff.lint.per-file-ignores]
 # Tests and docs were not import-sorted before the switch to ruff
 "tests/**" = ["I"]
+# Most of the tests come from mongomock, so only hold litemongo's own code to the stricter rules
+"tests/{diff,test_*_store}.py" = ["I", "A", "B", "PL"]
 "docs/**" = ["I"]
+
+[tool.ruff.lint.flake8-builtins]
+# These shadow builtins but mirror pymongo's API
+ignorelist = ["filter", "id", "type"]
+
+[tool.ruff.lint.pylint]
+max-args = 10
+max-locals = 20
 
 [tool.ruff.lint.mccabe]
 max-complexity = 18
@@ -75,32 +98,26 @@ max-complexity = 18
 [tool.ruff.lint.isort]
 force-sort-within-sections = true
 
-[tool.pylint.MASTER]
-ignore-paths = '^src/litemongo/_vendor/'
+[tool.ty.environment]
+python-version = "3.11"
 
-[tool.pylint.format]
-max-line-length = 100
-
-[tool.pylint.messages_control]
-disable = [
-    # Unfortunately jaxtyping decorator creates a function that seems to mistakenly be identified as
-    # not returning anything, so we have to disable the error below for now
-    'assignment-from-no-return',
-    'duplicate-code',
-    'import-outside-toplevel',
-    'missing-docstring',
-    'locally-disabled',
-    'too-few-public-methods',
-    'too-many-instance-attributes',
-    'use-dict-literal',
-    'undefined-all-variable',
+[tool.ty.src]
+include = ["src", "tests", "scripts"]
+exclude = [
+    # Vendored third-party code
+    "src/litemongo/_vendor",
+    # Files that do not pass ty yet.  Please remove files from this list as they are fixed so
+    # that they are checked from then on, the aim being to remove these altogether.
+    "src/litemongo/client.py",
+    "src/litemongo/h5py_store.py",
+    "src/litemongo/pytables_store.py",
+    "src/litemongo/sqlite_store.py",
+    "tests/diff.py",
+    "tests/test_h5py_store.py",
+    "tests/test_pytables_store.py",
+    "tests/test_query_planning.py",
+    "tests/test_sqlite_store.py",
 ]
-
-[tool.pylint.design]
-max-args = 10
-max-locals = 20
-max-parents = 12
-
 
 [tool.commitizen]
 tag_format = "v$major.$minor.$patch"

@@ -1537,7 +1537,7 @@ class CollectionAPITest(TestCase):
         self.db["coll_name"].insert_many([first, second, third])
         cursor = self.db["coll_name"].find()
         with self.assertRaises(IndexError):
-            cursor[-1]  # pylint: disable=pointless-statement
+            cursor[-1]
 
     def test__cursor_getitem_bad_index(self):
         first = {"name": "first"}
@@ -1546,7 +1546,7 @@ class CollectionAPITest(TestCase):
         self.db["coll_name"].insert_many([first, second, third])
         cursor = self.db["coll_name"].find()
         with self.assertRaises(TypeError):
-            cursor["not_a_number"]  # pylint: disable=pointless-statement
+            cursor["not_a_number"]
 
     def test__find_with_skip_param(self):
         """Make sure that find() will take in account skip parameter"""

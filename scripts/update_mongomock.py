@@ -105,8 +105,8 @@ def main():
     new_ref = git(repo, "rev-parse", f"{args.ref}^{{commit}}")
     version = args.version or git(repo, "describe", "--tags", "--abbrev=0", new_ref)
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp = pathlib.Path(tmp)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp = pathlib.Path(tmp_dir)
         (tmp / "base").mkdir()
         (tmp / "theirs").mkdir()
         base = export(repo, base_ref, version, tmp / "base")

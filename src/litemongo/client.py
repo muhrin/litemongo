@@ -25,7 +25,6 @@ def create_store(
     spec: Union[mongomock_store.ServerStore, str, parse.ParseResult],
 ) -> mongomock_store.ServerStore:
     """Server store factory"""
-    # pylint: disable=import-outside-toplevel
     # Check against the mongomock base class so the in-memory store is accepted too
     if isinstance(spec, mongomock_store.ServerStore):
         return spec
@@ -67,7 +66,6 @@ def create_store(
 
 
 class MongoClient(mongomock.MongoClient):
-    # pylint: disable=abstract-method
     def __init__(
         self,
         store: stores.ServerStore,
