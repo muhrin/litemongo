@@ -890,8 +890,8 @@ class Collection:
                 # Make sure it still respect the unique indexes and, if not, to
                 # revert modifications
                 try:
-                    # Save the updated document in the store as the store may have provided a copy of the
-                    # document rather than a dict that is being mutated in place.
+                    # Save the updated document in the store as the store may have provided a
+                    # copy of the document rather than a dict that is being mutated in place.
                     self._store[existing_document['_id']] = existing_document
                     self._ensure_uniques(existing_document)
                     num_updated += 1

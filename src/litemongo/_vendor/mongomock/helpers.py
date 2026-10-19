@@ -440,6 +440,7 @@ def mongodb_to_bool(value):
 
     return value not in [False, None, 0]
 
+
 def count_iter(iterable: Iterable) -> int:
     """
     Count the number of entries in an iterable.
