@@ -5,7 +5,6 @@ import pathlib
 from typing import Union
 
 import bson
-from packaging import version
 import tables
 import tables.nodes.filenode
 
@@ -223,7 +222,7 @@ class GroupDict(collections.abc.MutableMapping):
             raise KeyError(key) from None
 
     def _encode_doc(self, doc: dict):
-        check_keys = version.parse("3.6") > helpers.PYMONGO_VERSION
+        check_keys = helpers.PYMONGO_BELOW_3_6
         return bson.encode(doc, check_keys=check_keys, codec_options=self._codec_options)
 
     def _decode_doc(self, dataset: tables.Array) -> dict:

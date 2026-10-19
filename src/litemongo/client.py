@@ -1,13 +1,17 @@
 """Definition of MongoClient and methods to create one"""
 
 import pathlib
-from typing import Union
+from typing import Dict, Union
 from urllib import parse
 
 from . import stores
 from ._vendor import mongomock
+from ._vendor.mongomock import store as mongomock_store
 
 __all__ = "MongoClient", "StoreType", "connect"
+
+# In-memory stores keyed by URI location, so connecting to the same URI twice sees the same data
+_MEMORY_STORES: Dict[str, mongomock_store.ServerStore] = {}
 
 
 class StoreType:
@@ -17,10 +21,11 @@ class StoreType:
     MEMORY = "memory"
 
 
-def create_store(spec: Union[stores.ServerStore, str]) -> stores.ServerStore:
+def create_store(spec: Union[mongomock_store.ServerStore, str]) -> mongomock_store.ServerStore:
     """Server store factory"""
     # pylint: disable=import-outside-toplevel
-    if isinstance(spec, stores.ServerStore):
+    # Check against the mongomock base class so the in-memory store is accepted too
+    if isinstance(spec, mongomock_store.ServerStore):
         return spec
 
     if isinstance(spec, str):
@@ -47,9 +52,10 @@ def create_store(spec: Union[stores.ServerStore, str]) -> stores.ServerStore:
 
             return sqlite_store.ServerStore(_parse_path(uri))
         if store_type == StoreType.MEMORY:
-            from ._vendor.mongomock import store as mongomock_store
-
-            return mongomock_store.ServerStore()
+            key = uri.netloc + uri.path
+            if key not in _MEMORY_STORES:
+                _MEMORY_STORES[key] = mongomock_store.ServerStore()
+            return _MEMORY_STORES[key]
 
     raise TypeError(f"Unexpected server store specification: {spec}")
 

@@ -622,7 +622,7 @@ class Collection:
 
         if BSON:
             # bson validation
-            check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+            check_keys = helpers.PYMONGO_BELOW_3_6
             if not check_keys:
                 _validate_data_fields(data)
 
@@ -665,6 +665,11 @@ class Collection:
                 except KeyError:
                     find_kwargs[key] = None
             if is_sparse and set(find_kwargs.values()) == {None}:
+                continue
+            # litemongo: a document outside a partial index can't conflict with anything
+            if partial_filter_expression is not None and not filter_applies(
+                partial_filter_expression, new_data
+            ):
                 continue
             if partial_filter_expression is not None:
                 find_kwargs = {'$and': [partial_filter_expression, find_kwargs]}
@@ -1145,7 +1150,7 @@ class Collection:
                     existing_document['_id'] = _id
                 if BSON:
                     # bson validation
-                    check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+                    check_keys = helpers.PYMONGO_BELOW_3_6
                     if not check_keys:
                         _validate_data_fields(document)
                     _bson_encode(document, check_keys=check_keys, codec_options=self.codec_options)
@@ -1406,7 +1411,7 @@ class Collection:
         """Copy only the specified fields."""
 
         # https://pymongo.readthedocs.io/en/stable/migrate-to-pymongo4.html#collection-find-returns-entire-document-with-empty-projection
-        if fields is None or not fields and version.parse('4.0') <= helpers.PYMONGO_VERSION:
+        if fields is None or not fields and helpers.PYMONGO_AT_LEAST_4_0:
             return _copy_field(doc, container)
 
         if not fields:
@@ -1536,7 +1541,8 @@ class Collection:
         if self._store.is_empty:
             filter_applies(filter, {})
 
-        return (document for document in self._store.documents
+        # litemongo: use the store's indexes to avoid looking at every document
+        return (document for document in self._store.find_candidates(filter)
                 if filter_applies(filter, document))
 
     def find_one(self, filter=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg
@@ -1833,8 +1839,12 @@ class Collection:
         if is_unique:
             indexed = set()
             indexed_list = []
+            partial_filter = config.get('partialFilterExpression')
             documents_gen = self._store.documents
             for doc in documents_gen:
+                # litemongo: documents outside a partial index don't count towards uniqueness
+                if partial_filter is not None and not filter_applies(partial_filter, doc):
+                    continue
                 index = []
                 for key, _order in index_list:
                     try:
@@ -2095,7 +2105,24 @@ class Collection:
             return ret_array
 
     def aggregate(self, pipeline, session=None, **unused_kwargs):
-        in_collection = list(self.find())
+        in_collection = None
+        # litemongo: if the pipeline starts with a $match, only copy the documents that could match
+        # it (according to the indexes) rather than the entire collection.  The $match stage is
+        # still run as normal so the results are exactly the same.
+        if pipeline and isinstance(pipeline[0], Mapping) and set(pipeline[0]) == {'$match'}:
+            spec = pipeline[0]['$match']
+            if isinstance(spec, Mapping):
+                spec = helpers.patch_datetime_awareness_in_document(spec)
+                # Filter in exactly the same way as the $match stage, but before copying
+                in_collection = [
+                    self._copy_only_fields(document, None, dict)
+                    for document in self._store.find_candidates(spec)
+                    if filter_applies(
+                        spec, helpers.patch_datetime_awareness_in_document(document)
+                    )
+                ]
+        if in_collection is None:
+            in_collection = list(self.find())
         return aggregate.process_pipeline(in_collection, self.database, pipeline, session)
 
     def with_options(
@@ -2380,7 +2407,7 @@ def _set_updater(doc, field_name, value, codec_options=None):
         value = copy.deepcopy(value)
     if BSON:
         # bson validation
-        check_keys = version.parse('3.6') > helpers.PYMONGO_VERSION
+        check_keys = helpers.PYMONGO_BELOW_3_6
         if not check_keys and '\0' in field_name or field_name.startswith('$'):
             raise InvalidDocument(
                 f'Field name cannot contain the null character and top-level field name '

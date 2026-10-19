@@ -129,6 +129,12 @@ class MongoClient:
     def codec_options(self):
         return self._codec_options
 
+    @property
+    def options(self):
+        """litemongo: pymongo (e.g. GridFS) reads the client timeout from here.  Without this,
+        attribute access falls through to __getattr__ and returns a Database object instead."""
+        return _ClientOptions()
+
     def server_info(self):
         return {
             'version': self._server_version,
@@ -213,3 +219,9 @@ class MongoClient:
     def start_session(self, causal_consistency=True, default_transaction_options=None):
         """Start a logical session."""
         raise NotImplementedError('Mongomock does not support sessions yet')
+
+
+class _ClientOptions:
+    """The subset of pymongo's ClientOptions that pymongo itself reads from a client"""
+
+    timeout = None

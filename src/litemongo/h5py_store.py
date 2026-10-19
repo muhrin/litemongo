@@ -7,7 +7,6 @@ from typing import Union
 import bson
 import h5py
 import numpy as np
-from packaging import version
 from typing_extensions import override
 
 from . import stores
@@ -229,7 +228,7 @@ class GroupDict(collections.abc.MutableMapping[str, dict]):
         del self._group[key]
 
     def _encode_doc(self, doc: dict):
-        check_keys = version.parse("3.6") > helpers.PYMONGO_VERSION
+        check_keys = helpers.PYMONGO_BELOW_3_6
         encoded = bson.encode(doc, check_keys=check_keys, codec_options=self._codec_options)
         return np.frombuffer(encoded, dtype="uint8")
 

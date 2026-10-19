@@ -3,6 +3,7 @@ import datetime
 import functools
 
 from .. import mongomock
+from . import indexing
 from .thread import RWLock
 
 
@@ -63,12 +64,17 @@ class DatabaseStore:
 class CollectionStore:
     """Object holding the data for a collection."""
 
+    # litemongo: hash indexes used for query planning (see indexing.py), built lazily
+    _query_index = None
+
     def __init__(self, name):
         self._documents = collections.OrderedDict()
         self.indexes = {}
         self._is_force_created = False
         self.name = name
         self._ttl_indexes = {}
+        # litemongo: hash indexes used for query planning, built lazily
+        self._query_index = None
 
         # 694 - Lock for safely iterating and mutating OrderedDicts
         self._rwlock = RWLock()
@@ -85,6 +91,7 @@ class CollectionStore:
         self.indexes = {}
         self._ttl_indexes = {}
         self._is_force_created = False
+        self._query_index = None
 
     def create_index(self, index_name, index_dict):
         self.indexes[index_name] = index_dict
@@ -117,10 +124,14 @@ class CollectionStore:
     def __setitem__(self, key, val):
         with self._rwlock.writer():
             self._documents[key] = val
+            if self._query_index is not None:
+                self._query_index.add(self._index_key(key), val)
 
     def __delitem__(self, key):
         with self._rwlock.writer():
             del self._documents[key]
+            if self._query_index is not None:
+                self._query_index.remove(self._index_key(key))
 
     def __len__(self):
         self._remove_expired_documents()
@@ -132,6 +143,57 @@ class CollectionStore:
         self._remove_expired_documents()
         with self._rwlock.reader():
             yield from self._documents.values()
+
+    # region litemongo query planning
+
+    def _index_key(self, key):
+        """The key used for a document in the query index (stores may encode their keys)"""
+        return key
+
+    def _iter_items(self):
+        """Iterate over (store key, document) pairs in natural order"""
+        with self._rwlock.reader():
+            yield from list(self._documents.items())
+
+    def _query_index_is_stale(self) -> bool:
+        """Persistent stores override this to report if the data was changed elsewhere"""
+        return False
+
+    def _get_query_index(self) -> indexing.CollectionIndexes:
+        # Always check staleness so that persistent stores can track what they've seen
+        stale = self._query_index_is_stale()
+        if self._query_index is None or stale:
+            query_index = indexing.CollectionIndexes()
+            query_index.set_paths(indexing.index_paths(self.indexes.values()), ())
+            for key, doc in self._iter_items():
+                query_index.add(key, doc)
+            self._query_index = query_index
+        else:
+            # Keep the indexed paths in line with the declared indexes
+            self._query_index.set_paths(
+                indexing.index_paths(self.indexes.values()), self._iter_items()
+            )
+        return self._query_index
+
+    def find_candidates(self, filter):  # pylint: disable=redefined-builtin
+        """Get the documents (in natural order) that could match the given filter.  The caller
+        must still check each document against the filter."""
+        self._remove_expired_documents()
+        query_index = self._get_query_index()
+        keys = query_index.candidates(filter)
+        if keys is None:
+            return self.documents
+        return self._get_many(query_index.in_natural_order(keys))
+
+    def _get_many(self, keys):
+        with self._rwlock.reader():
+            for key in keys:
+                try:
+                    yield self._documents[key]
+                except KeyError:
+                    pass
+
+    # endregion
 
     def _remove_expired_documents(self):
         for index in self._ttl_indexes.values():

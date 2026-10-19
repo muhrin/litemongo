@@ -2,29 +2,29 @@ name: continuous-integration
 
 on: [ push, pull_request ]
 
+env:
+  DEFAULT_PYTHON: '3.13'
+
 jobs:
   pre-commit:
-
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v2
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.0
         with:
-          python-version: '3.10'
+          python-version: ${{ env.DEFAULT_PYTHON }}
+          enable-cache: true
 
       - name: Install python dependencies
-        run: |
-          pip install -e .[dev,gui]
-          pip freeze
+        run: uv sync --locked
+
       - name: Run pre-commit
         run:
-          pre-commit run --all-files || ( git status --short ; git diff ; exit 1 )
-
-
+          uv run pre-commit run --all-files || ( git status --short ; git diff ; exit 1 )
 
   tests:
     runs-on: ubuntu-latest
@@ -32,18 +32,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ '3.8', '3.9', '3.10', '3.11', '3.12' ]
+        python-version: [ '3.11', '3.12', '3.13', '3.14' ]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.0
         with:
           python-version: ${{ matrix.python-version }}
+          enable-cache: true
 
       - name: Install python dependencies
-        run: pip install -e .[dev,backends]
+        run: uv sync --locked --all-extras
 
       - name: Run pytest
-        run: pytest -sv -p no:nb_regression tests
+        run: uv run pytest -sv tests

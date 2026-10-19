@@ -34,6 +34,10 @@ except ImportError:
     PYMONGO_VERSION = version.parse('4.0')
     HAVE_PYMONGO = False
 
+# litemongo: these are checked on hot paths (every insert/update/find), so only parse them once
+PYMONGO_BELOW_3_6 = version.parse('3.6') > PYMONGO_VERSION
+PYMONGO_AT_LEAST_4_0 = version.parse('4.0') <= PYMONGO_VERSION
+
 # Cache the RegExp pattern type.
 RE_TYPE = type(re.compile(''))
 _HOST_MATCH = re.compile(r'^([^@]+@)?([^:]+|\[[^\]]+\])(:([^:]+))?$')
