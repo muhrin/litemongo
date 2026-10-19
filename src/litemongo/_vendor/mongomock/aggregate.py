@@ -332,6 +332,8 @@ class _Parser:
                     can_generate_array=True,
                 )
             return helpers.get_value_by_dot(self._doc_dict, expression[1:], can_generate_array=True)
+        if isinstance(expression, list):
+            return list(map(self._parse_basic_expression, expression))
         return expression
 
     def _handle_boolean_operator(self, operator, values):
@@ -1078,13 +1080,18 @@ class _Parser:
             f'pipeline, it is currently not implemented in Mongomock.'
         )
 
-    def _handle_object_operator(self, operator, values):
+    def _handle_object_operator(self, operator, values) -> dict:
         if operator == '$mergeObjects':
-            pass
+            merged = {}
+            for entry in self.parse_many(values):
+                if entry:
+                    merged.update(entry)
+            return merged
 
         raise NotImplementedError(
-            "Although '%s' is a valid set operator for the aggregation "
-            'pipeline, it is currently not implemented in Mongomock.' % operator)
+            f"Although '{operator}' is a valid set operator for the aggregation "
+            'pipeline, it is currently not implemented in Mongomock.'
+        )
 
 
 def _parse_expression(expression, doc_dict, ignore_missing_keys=False, user_vars=None):
@@ -1295,6 +1302,7 @@ def _handle_graph_lookup_stage(in_collection, database, options, user_vars):
         try:
             result = _parse_expression(start_with, doc, user_vars=user_vars)
         except KeyError:
+            doc[local_name] = []  # No match should return empty list
             continue
         origin_matches = doc[local_name] = _find_matches_for_depth(result)
         while origin_matches and (max_depth is None or depth < max_depth):

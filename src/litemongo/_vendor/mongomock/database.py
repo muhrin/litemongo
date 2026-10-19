@@ -51,9 +51,10 @@ class Database:
         if read_concern and not isinstance(read_concern, ReadConcern):
             raise TypeError('read_concern must be an instance of pymongo.read_concern.ReadConcern')
         self._read_concern = read_concern or ReadConcern()
+        self._store.set_codec_options(codec_options.to_pymongo())
 
     def __getitem__(self, coll_name):
-        return self.get_collection(coll_name)
+        return self.get_collection(coll_name, codec_options=self._codec_options)
 
     def __getattr__(self, attr):
         if attr.startswith('_'):

@@ -2,6 +2,8 @@ import collections
 import datetime
 import functools
 
+import bson
+
 from .. import mongomock
 from . import indexing
 from .thread import RWLock
@@ -32,6 +34,7 @@ class DatabaseStore:
 
     def __init__(self):
         self._collections = {}
+        self._codec_options = None
 
     def __getitem__(self, col_name):
         try:
@@ -42,6 +45,9 @@ class DatabaseStore:
 
     def __contains__(self, col_name):
         return self[col_name].is_created
+
+    def set_codec_options(self, codec_options: bson.CodecOptions):
+        self._codec_options = codec_options
 
     def list_created_collection_names(self):
         return [name for name, col in self._collections.items() if col.is_created]

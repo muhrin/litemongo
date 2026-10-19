@@ -21,15 +21,21 @@ class StoreType:
     MEMORY = "memory"
 
 
-def create_store(spec: Union[mongomock_store.ServerStore, str]) -> mongomock_store.ServerStore:
+def create_store(
+    spec: Union[mongomock_store.ServerStore, str, parse.ParseResult],
+) -> mongomock_store.ServerStore:
     """Server store factory"""
     # pylint: disable=import-outside-toplevel
     # Check against the mongomock base class so the in-memory store is accepted too
     if isinstance(spec, mongomock_store.ServerStore):
         return spec
 
-    if isinstance(spec, str):
-        uri = parse.urlparse(spec)
+    if isinstance(spec, (str, parse.ParseResult)):
+        if isinstance(spec, str):
+            uri = parse.urlparse(spec)
+        else:
+            uri = spec
+
         store_type = StoreType.SQLITE  # The default
 
         if uri.query:
@@ -96,7 +102,7 @@ class MongoClient(mongomock.MongoClient):
 
 
 def connect(
-    path: str,
+    path: Union[str, parse.ParseResult],
     document_class=dict,
     tz_aware=False,
     read_preference=None,
@@ -104,7 +110,10 @@ def connect(
 ) -> MongoClient:
     """Convenience function to build a MongoClient.  This will create a server store based on the
     passed path string"""
-    parsed = parse.urlparse(path)
+    if isinstance(path, str):
+        parsed = parse.urlparse(path)
+    else:
+        parsed = path
     database = parsed.fragment
     return MongoClient(
         create_store(path),
