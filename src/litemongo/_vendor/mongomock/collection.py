@@ -2236,6 +2236,8 @@ class Cursor:
         self._skip = skip
         self._factory_last_generated_results = None
         self._results = None
+        # litemongo: results are fetched from this, as needed, rather than all at once
+        self._source = None
         self._factory = functools.partial(collection._get_dataset, spec, sort, projection, dict)
         # pymongo limit defaults to 0, returning everything
         self._limit = limit if limit != 0 else None
@@ -2243,17 +2245,51 @@ class Cursor:
         self.session = session
         self.rewind()
 
-    def _compute_results(self, with_limit_and_skip=False):
-        # Recompute the result only if the query has changed
-        if not self._results or self._factory_last_generated_results != self._factory:
+    def _fetch(self, count=None):
+        """litemongo: make sure that (at least) the first count results have been fetched (or all
+        of them if count is None), and return the results fetched so far.
+
+        Results used to all be fetched as soon as the cursor was used, so getting the first result
+        of a large query meant reading everything that matched.  Now they are fetched as needed (as
+        long as the query doesn't need everything, e.g. to sort)."""
+        # Recompute the result only if the query has changed (or there were no results)
+        exhausted_and_empty = not self._results and self._source is None
+        if (
+            self._results is None
+            or exhausted_and_empty
+            or self._factory_last_generated_results != self._factory
+        ):
+            documents = self._factory()
             if self.collection.codec_options.tz_aware:
-                results = [
-                    helpers.make_datetime_timezone_aware_in_document(x) for x in self._factory()
-                ]
-            else:
-                results = list(self._factory())
+                documents = map(helpers.make_datetime_timezone_aware_in_document, documents)
             self._factory_last_generated_results = self._factory
-            self._results = results
+            self._results = []
+            self._source = iter(documents)
+
+        if self._source is not None:
+            if count is None:
+                self._results.extend(self._source)
+                self._source = None
+            elif len(self._results) < count:
+                self._results.extend(itertools.islice(self._source, count - len(self._results)))
+                if len(self._results) < count:
+                    self._source = None  # Exhausted
+
+        return self._results
+
+    def _result_at(self, index):
+        """litemongo: get the result at the given index (after skip and within limit) without
+        fetching more than needed"""
+        if self._limit and index >= abs(self._limit):
+            raise IndexError(index)
+        position = self._skip + index
+        results = self._fetch(position + 1)
+        if position >= len(results):
+            raise IndexError(index)
+        return results[position]
+
+    def _compute_results(self, with_limit_and_skip=False):
+        self._fetch()
         if with_limit_and_skip:
             results = self._results[self._skip :]
             if self._limit:
@@ -2274,7 +2310,7 @@ class Cursor:
 
     def __next__(self):
         try:
-            doc = self._compute_results(with_limit_and_skip=True)[self._emitted]
+            doc = self._result_at(self._emitted)
             self._emitted += 1
             return doc
         except IndexError as err:
@@ -2376,7 +2412,7 @@ class Cursor:
             raise TypeError(f"index '{index}' cannot be applied to Cursor instances")
         if index < 0:
             raise IndexError('Cursor instances do not support negativeindices')
-        return self._compute_results(with_limit_and_skip=True)[index]
+        return self._result_at(index)
 
     def __enter__(self):
         return self

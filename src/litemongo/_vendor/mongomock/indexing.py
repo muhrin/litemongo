@@ -249,6 +249,11 @@ class CollectionIndexes:
         for index in self._fields.values():
             index.remove(store_key)
 
+    def all_in_natural_order(self) -> list:
+        """Get the store keys of all of the documents, in insertion order"""
+        docs = self._docs
+        return sorted(docs, key=docs.__getitem__)
+
     def in_natural_order(self, store_keys: Iterable[Hashable]) -> list:
         """Sort the given store keys into insertion order"""
         docs = self._docs

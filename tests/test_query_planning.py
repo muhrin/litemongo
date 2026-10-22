@@ -427,3 +427,36 @@ def test_graph_lookup_uses_indexes(database):
 
 
 # endregion
+
+
+# region Cursors
+
+
+def test_cursor_fetches_results_as_needed(database, monkeypatch):
+    """Getting the first results of a query shouldn't mean reading everything that matches"""
+    from litemongo._vendor.mongomock import collection as collection_module
+
+    collection = database["lazy"]
+    collection.insert_many([{"n": idx, "even": idx % 2 == 0} for idx in range(5_000)])
+
+    checked = []
+    original = collection_module.filter_applies
+
+    def counting_filter_applies(search_filter, document, *args, **kwargs):
+        checked.append(document)
+        return original(search_filter, document, *args, **kwargs)
+
+    monkeypatch.setattr(collection_module, "filter_applies", counting_filter_applies)
+
+    cursor = collection.find({"even": True})  # Not indexed, so every document is a candidate
+    assert next(cursor)["n"] == 0
+    assert next(cursor)["n"] == 2
+    assert len(checked) <= 10
+
+    # The rest is still all there, in order, and skip/limit work as before
+    assert [doc["n"] for doc in cursor] == list(range(4, 5_000, 2))
+    assert [doc["n"] for doc in collection.find({"even": True}).skip(10).limit(3)] == [20, 22, 24]
+    assert collection.find({"even": True})[5]["n"] == 10
+
+
+# endregion

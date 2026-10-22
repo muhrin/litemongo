@@ -188,16 +188,22 @@ class CollectionStore:
         query_index = self._get_query_index()
         keys = query_index.candidates(filter)
         if keys is None:
-            return self.documents
+            # All documents are candidates.  Take their keys now (rather than iterating over the
+            # store) so that the documents can be read as the results are needed, while changes made
+            # during the iteration (e.g. updating each document found) don't change what is seen.
+            return self._get_many(query_index.all_in_natural_order())
         return self._get_many(query_index.in_natural_order(keys))
 
     def _get_many(self, keys):
-        with self._rwlock.reader():
-            for key in keys:
+        # litemongo: documents are read as they are needed, so only hold the lock while reading
+        # each one (otherwise, e.g., updating a document while iterating over a query deadlocks)
+        for key in keys:
+            with self._rwlock.reader():
                 try:
-                    yield self._documents[key]
+                    document = self._documents[key]
                 except KeyError:
-                    pass
+                    continue
+            yield document
 
     # endregion
 
