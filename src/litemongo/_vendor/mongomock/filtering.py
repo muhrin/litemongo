@@ -287,9 +287,61 @@ def _force_list(v):
     return v if isinstance(v, (list, tuple)) else [v]
 
 
+class _InValues(list):
+    """litemongo: the array of a $in (or $nin) prepared for checking many documents against.
+
+    Checking whether a value is in a list means comparing it with every entry, which makes queries
+    with a large $in (e.g. thousands of ids) slow, as every candidate document is checked against
+    the whole list.  This also keeps the hashable entries in a set, so they can be looked up
+    directly.  Entries that can't be hashed are still compared one by one.
+    """
+
+    def __init__(self, values):
+        super().__init__(values)
+        self.has_regex = any(isinstance(value, _RE_TYPES) for value in self)
+        self.hashable = set()
+        self.unhashable = []
+        for value in self:
+            try:
+                self.hashable.add(value)
+            except TypeError:
+                self.unhashable.append(value)
+
+    def contains(self, value) -> bool:
+        try:
+            if value in self.hashable:
+                return True
+        except TypeError:
+            # The value can't be hashed, so compare it with everything
+            return value in self
+        return any(value == entry for entry in self.unhashable)
+
+
+def prepare_filter(search_filter):
+    """litemongo: prepare a filter for being applied to many documents (see _InValues).  The passed
+    filter isn't modified."""
+    if not isinstance(search_filter, dict):
+        return search_filter
+
+    prepared = {}
+    for key, value in search_filter.items():
+        if key in ('$in', '$nin') and isinstance(value, (list, tuple)):
+            value = _InValues(value)
+        elif key in LOGICAL_OPERATOR_MAP and isinstance(value, (list, tuple)):
+            value = [prepare_filter(sub_filter) for sub_filter in value]
+        elif isinstance(value, dict):
+            value = prepare_filter(value)
+        prepared[key] = value
+    return prepared
+
+
 def _in_op(doc_val, search_val):
     if not isinstance(search_val, (list, tuple)):
         raise OperationFailure('$in needs an array')
+    if isinstance(search_val, _InValues) and not search_val.has_regex:
+        if doc_val is NOTHING and None in search_val.hashable:
+            return True
+        return any(search_val.contains(value) for value in _force_list(doc_val))
     if doc_val is NOTHING and None in search_val:
         return True
     doc_val = _force_list(doc_val)

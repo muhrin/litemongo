@@ -59,7 +59,7 @@ from . import InvalidOperation
 from . import ObjectId
 from . import OperationFailure
 from . import WriteError
-from .filtering import filter_applies
+from .filtering import filter_applies, prepare_filter
 from .not_implemented import raise_for_feature as raise_not_implemented
 from .results import BulkWriteResult
 from .results import DeleteResult
@@ -1541,9 +1541,11 @@ class Collection:
         if self._store.is_empty:
             filter_applies(filter, {})
 
-        # litemongo: use the store's indexes to avoid looking at every document
+        # litemongo: use the store's indexes to avoid looking at every document, and prepare the
+        # filter once for checking all of the candidates against
+        prepared = prepare_filter(filter)
         return (document for document in self._store.find_candidates(filter)
-                if filter_applies(filter, document))
+                if filter_applies(prepared, document))
 
     def find_one(self, filter=None, *args, **kwargs):  # pylint: disable=keyword-arg-before-vararg
         # Allow calling find_one with a non-dict argument that gets used as

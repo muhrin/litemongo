@@ -2,6 +2,7 @@
 
 import datetime
 import random
+import time
 import uuid
 
 from bson import Decimal128, ObjectId
@@ -312,3 +313,55 @@ def test_sqlite_legacy_key_format(tmp_path):
     coll.rename("renamed")
     renamed = litemongo.connect(uri).get_default_database().renamed
     assert renamed.find_one({"_id": oid})["v"] == 1
+
+
+# region Large $in queries
+
+
+def test_prepare_filter_leaves_the_filter_alone():
+    ids = [1, 2, 3]
+    query = {"$or": [{"a": {"$in": ids}}, {"b": {"$elemMatch": {"c": {"$nin": ids}}}}]}
+    prepared = filtering.prepare_filter(query)
+    assert prepared == query
+    assert type(query["$or"][0]["a"]["$in"]) is list  # The original is untouched
+    assert isinstance(prepared["$or"][0]["a"]["$in"], filtering._InValues)
+    assert isinstance(prepared["$or"][1]["b"]["$elemMatch"]["c"]["$nin"], filtering._InValues)
+
+
+@pytest.mark.parametrize(
+    "search",
+    [
+        [1, "a", None],
+        [{"x": 1}, [1, 2], 2.0],  # Unhashable entries
+        [True, ObjectId("5e075d6244572f823ed93274"), Decimal128("1.5")],
+    ],
+)
+@pytest.mark.parametrize(
+    "value",
+    [1, 1.0, True, "a", None, {"x": 1}, [1, 2], [3, "a"], 2, Decimal128("1.5"), "missing"],
+)
+def test_prepared_in_matches_list(search, value):
+    """The prepared $in should give the same answers as checking the list"""
+    document = {} if value == "missing" else {"field": value}
+    for operator in ("$in", "$nin"):
+        query = {"field": {operator: search}}
+        expected = filtering.filter_applies(query, document)
+        assert filtering.filter_applies(filtering.prepare_filter(query), document) == expected
+
+
+def test_large_in_query(database):
+    """Queries with many values in a $in should take time proportional to the number of values"""
+    collection = database["large"]
+    ids = [ObjectId() for _ in range(20_000)]
+    collection.insert_many([{"_id": obj_id, "n": idx} for idx, obj_id in enumerate(ids)])
+
+    start = time.perf_counter()
+    found = list(collection.find({"_id": {"$in": ids[::2]}}, {"_id": 1}))
+    assert len(found) == 10_000
+    assert collection.count_documents({"n": {"$nin": list(range(0, 20_000, 2))}}) == 10_000
+    assert collection.delete_many({"_id": {"$in": ids[:15_000]}}).deleted_count == 15_000
+    # Comparing every document with every value would take minutes
+    assert time.perf_counter() - start < 30
+
+
+# endregion
