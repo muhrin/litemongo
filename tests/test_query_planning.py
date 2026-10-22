@@ -365,3 +365,65 @@ def test_large_in_query(database):
 
 
 # endregion
+
+
+# region $graphLookup
+
+
+def _graph_lookup(name, max_depth=None):
+    stage = {
+        "from": "tree",
+        "startWith": "$_id",
+        "connectFromField": "_id",
+        "connectToField": "parent",
+        "as": "found",
+        "restrictSearchWithMatch": {"name": name} if name else {},
+    }
+    if max_depth is not None:
+        stage["maxDepth"] = max_depth
+    return {"$graphLookup": stage}
+
+
+def test_graph_lookup_restricted(database):
+    """restrictSearchWithMatch limits the search: documents that don't match aren't followed"""
+    tree = database["tree"]
+    tree.insert_many(
+        [
+            {"_id": "root", "parent": None, "name": "root"},
+            {"_id": "a", "parent": "root", "name": "x"},
+            {"_id": "b", "parent": "root", "name": "y"},
+            {"_id": "a1", "parent": "a", "name": "x"},
+            {"_id": "b1", "parent": "b", "name": "x"},  # Under a 'y', so not reached
+            {"_id": "a11", "parent": "a1", "name": "x"},
+        ]
+    )
+
+    def found(*stages):
+        result = list(tree.aggregate([{"$match": {"_id": "root"}}, *stages]))
+        return sorted(doc["_id"] for doc in result[0]["found"])
+
+    assert found(_graph_lookup("x")) == ["a", "a1", "a11"]
+    assert found(_graph_lookup("x", max_depth=0)) == ["a"]
+    assert found(_graph_lookup("y")) == ["b"]
+    assert found(_graph_lookup(None)) == ["a", "a1", "a11", "b", "b1"]
+
+
+def test_graph_lookup_uses_indexes(database):
+    """Finding a child by name (as pyOS does for paths) shouldn't look at all the children"""
+    tree = database["tree"]
+    tree.create_index("parent")
+    tree.create_index([("parent", 1), ("name", 1)], unique=True)
+    tree.insert_one({"_id": "root", "parent": None, "name": "root"})
+    tree.insert_many(
+        [{"_id": f"child{idx}", "parent": "root", "name": f"child{idx}"} for idx in range(20_000)]
+    )
+
+    start = time.perf_counter()
+    for idx in range(0, 20_000, 100):
+        result = list(tree.aggregate([{"$match": {"_id": "root"}}, _graph_lookup(f"child{idx}", 0)]))
+        assert [doc["_id"] for doc in result[0]["found"]] == [f"child{idx}"]
+    # Looking through all of the children for each of these would take minutes
+    assert time.perf_counter() - start < 30
+
+
+# endregion

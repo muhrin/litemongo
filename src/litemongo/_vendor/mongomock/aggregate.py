@@ -1282,13 +1282,16 @@ def _handle_graph_lookup_stage(in_collection, database, options, user_vars):
     def _find_matches_for_depth(query):
         if isinstance(query, list):
             query = {'$in': query}
-        matches = foreign_collection.find({connect_to_field: query})
+        search = {connect_to_field: query}
+        if restrict_search_with_match:
+            # litemongo: restrict the search in the query itself (rather than checking each match
+            # afterwards) so that indexes on the restricting fields can be used.  Otherwise, e.g.,
+            # finding one child by name means looking at every child.
+            search = {'$and': [search, restrict_search_with_match]}
+        matches = foreign_collection.find(search)
         new_matches = []
         for new_match in matches:
-            if (
-                filtering.filter_applies(restrict_search_with_match, new_match)
-                and new_match['_id'] not in found_items
-            ):
+            if new_match['_id'] not in found_items:
                 if depth_field is not None:
                     new_match = collections.OrderedDict(new_match, **{depth_field: depth})
                 new_matches.append(new_match)
