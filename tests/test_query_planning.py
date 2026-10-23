@@ -403,6 +403,22 @@ def test_large_in_query(database):
     assert time.perf_counter() - start < 30
 
 
+def test_large_in_aggregate_match(database):
+    """As for find(), a $match stage with many values in a $in should be fast"""
+    collection = database["large"]
+    ids = [ObjectId() for _ in range(20_000)]
+    collection.insert_many([{"_id": obj_id, "n": idx} for idx, obj_id in enumerate(ids)])
+
+    start = time.perf_counter()
+    pipeline = [{"$match": {"_id": {"$in": tuple(ids[::2])}}}, {"$project": {"n": 1}}]
+    found = list(collection.aggregate(pipeline))
+    assert sorted(doc["n"] for doc in found) == list(range(0, 20_000, 2))
+    pipeline = [{"$project": {"n": 1}}, {"$match": {"n": {"$nin": list(range(0, 20_000, 2))}}}]
+    assert len(list(collection.aggregate(pipeline))) == 10_000
+    # Comparing every document with every value would take minutes
+    assert time.perf_counter() - start < 30
+
+
 # endregion
 
 

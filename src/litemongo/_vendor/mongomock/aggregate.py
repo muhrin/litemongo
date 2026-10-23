@@ -1674,7 +1674,8 @@ def _handle_facet_stage(in_collection, database, options, user_vars):
 
 
 def _handle_match_stage(in_collection, database, options, user_vars):
-    spec = helpers.patch_datetime_awareness_in_document(options)
+    # litemongo: prepare the filter, as find() does, e.g. so a large $in is fast
+    spec = filtering.prepare_filter(helpers.patch_datetime_awareness_in_document(options))
     return [
         doc
         for doc in in_collection

@@ -2120,12 +2120,13 @@ class Collection:
             spec = pipeline[0]['$match']
             if isinstance(spec, Mapping):
                 spec = helpers.patch_datetime_awareness_in_document(spec)
+                prepared = prepare_filter(spec)  # E.g. so a large $in is fast
                 # Filter in exactly the same way as the $match stage, but before copying
                 in_collection = [
                     self._copy_only_fields(document, None, dict)
                     for document in self._store.find_candidates(spec)
                     if filter_applies(
-                        spec, helpers.patch_datetime_awareness_in_document(document)
+                        prepared, helpers.patch_datetime_awareness_in_document(document)
                     )
                 ]
         if in_collection is None:
