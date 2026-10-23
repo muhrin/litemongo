@@ -54,7 +54,11 @@ class DatabaseStore(mongomock_store.DatabaseStore):
         try:
             return self._collections[col_name]
         except KeyError:
-            coll = CollectionStore(self._file, _require_group(self._file, self._group, col_name))
+            coll = CollectionStore(
+                self._file,
+                _require_group(self._file, self._group, col_name),
+                codec_options=self._codec_options,
+            )
             self._collections[col_name] = coll
             return coll
 
@@ -96,19 +100,21 @@ class CollectionStore(mongomock_store.CollectionStore):
     ):
         self._file = file
         self._group = group
-        self._codec_options = codec_options
+        self._codec_options = codec_options or bson.DEFAULT_CODEC_OPTIONS
 
-        try:
+        if self.IS_FORCE_CREATED not in self._group:
+            # Otherwise the collection exists already (e.g. the file is being reopened)
             file.create_array(self._group, self.IS_FORCE_CREATED, obj=False)
-        except ValueError:
-            pass
 
         doc_group = _require_group(self._file, self._group, self.DOCUMENTS)
-        self._documents = GroupDict(self._file, doc_group)
+        # Documents are encoded with the client's options (e.g. how to store UUIDs)
+        self._documents = GroupDict(self._file, doc_group, codec_options=self._codec_options)
 
         self.indexes = IndexDict(self._file, _require_group(self._file, self._group, self.INDEXES))
         self._ttl_indexes = GroupDict(
-            self._file, _require_group(self._file, self._group, self.TTL_INDEXES)
+            self._file,
+            _require_group(self._file, self._group, self.TTL_INDEXES),
+            codec_options=self._codec_options,
         )
 
         self._rwlock = mongomock_thread.RWLock()
