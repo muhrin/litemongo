@@ -148,6 +148,45 @@ def test_unique_index_uses_planner(database):
     assert coll.count_documents({}) == 2
 
 
+def test_existing_index_isnt_checked_again(database, monkeypatch):
+    """Creating an index that already exists doesn't need to check the documents again"""
+    coll = database.coll
+    keys = [("a", pymongo.ASCENDING), ("b", pymongo.ASCENDING)]
+    coll.create_index(keys, unique=True)
+    coll.insert_many([{"a": 1, "b": 1}, {"a": 1, "b": 2}])
+
+    def no_reading(_self):
+        raise AssertionError("The documents shouldn't be read")
+
+    monkeypatch.setattr(type(coll._store), "documents", property(no_reading))
+    assert coll.create_index(keys, unique=True) == "a_1_b_1"
+    monkeypatch.undo()
+
+    # The index is still in use, and asking for it with different options is still an error
+    with pytest.raises(pymongo.errors.DuplicateKeyError):
+        coll.insert_one({"a": 1, "b": 1})
+    with pytest.raises(pymongo.errors.OperationFailure):
+        coll.create_index(keys, unique=False)
+
+
+def test_sqlite_existing_index_isnt_checked_on_reconnect(tmp_path, monkeypatch):
+    """Clients usually declare their indexes each time they connect, which shouldn't need reading
+    all the documents"""
+    uri = f"litemongo://{tmp_path}/server#test"
+    coll = litemongo.connect(uri).get_default_database().coll
+    coll.create_index("a", unique=True)
+    coll.insert_many([{"a": idx} for idx in range(10)])
+
+    coll = litemongo.connect(uri).get_default_database().coll
+    monkeypatch.setattr(
+        type(coll._store), "documents", property(lambda _self: pytest.fail("Documents read"))
+    )
+    coll.create_index("a", unique=True)
+    monkeypatch.undo()
+    with pytest.raises(pymongo.errors.DuplicateKeyError):
+        coll.insert_one({"a": 3})
+
+
 def test_partial_unique_index(database):
     coll = database.coll
     # Documents without the field don't take part in a partial index...

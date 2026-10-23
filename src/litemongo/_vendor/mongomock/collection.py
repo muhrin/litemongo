@@ -1836,6 +1836,11 @@ class Collection:
             raise OperationFailure(
                 f'Index with name: {index_name} already exists with different options'
             )
+        if existing_index:
+            # litemongo: the index already exists (e.g. it is stored in the database), so the
+            # documents have been kept unique since it was created and there is nothing to do.
+            # Checking again means reading every document, each time a client is created.
+            return index_name
 
         # Check that documents already verify the uniqueness of this new index.
         if is_unique:
