@@ -21,7 +21,7 @@ import decimal
 import math
 import re
 import uuid
-from typing import Any, Dict, Hashable, Iterable, Optional, Set
+from typing import AbstractSet, Any, Dict, Hashable, Iterable, Optional, Set
 
 from bson import Binary, Decimal128, ObjectId, Regex
 
@@ -185,11 +185,18 @@ class FieldIndex:
                     if not entry:
                         del self._entries[key]
 
-    def candidates(self, keys: Iterable[Hashable]) -> Set[Hashable]:
-        found = set(self._unkeyed)
-        for key in keys:
-            found.update(self._entries.get(key, ()))
-        return found
+    def candidates(self, keys: Iterable[Hashable]) -> AbstractSet[Hashable]:
+        """Get the store keys of the documents that have any of the given keys.  The result must
+        only be read, as it may be the index's own set (copying it would make looking up a common
+        value, e.g. a version number, as slow as a full scan)."""
+        sources = [self._entries[key] for key in keys if key in self._entries]
+        if self._unkeyed:
+            sources.append(self._unkeyed)
+        if not sources:
+            return frozenset()
+        if len(sources) == 1:
+            return sources[0]
+        return set().union(*sources)
 
 
 class CollectionIndexes:
@@ -259,31 +266,35 @@ class CollectionIndexes:
         docs = self._docs
         return sorted((key for key in store_keys if key in docs), key=docs.__getitem__)
 
-    def candidates(self, filter) -> Optional[Set[Hashable]]:  # pylint: disable=redefined-builtin
+    def candidates(self, filter) -> Optional[AbstractSet[Hashable]]:  # pylint: disable=redefined-builtin
         """Get the store keys of the documents that could match the filter, or None if the filter
-        can't be planned (and a full scan is needed)"""
+        can't be planned (and a full scan is needed).  The result must only be read."""
         if not isinstance(filter, dict) or not filter:
             return None
 
-        best = None
+        found = []
         for field, condition in filter.items():
-            found = None
             if field == '$and' and isinstance(condition, (list, tuple)):
                 for sub_filter in condition:
                     sub_found = self.candidates(sub_filter)
                     if sub_found is not None:
-                        found = sub_found if found is None else found & sub_found
+                        found.append(sub_found)
             elif field in self._fields:
                 keys = query_keys(condition)
                 if keys is not None:
-                    found = self._fields[field].candidates(keys)
+                    found.append(self._fields[field].candidates(keys))
+            if found and not min(found, key=len):
+                return frozenset()  # Nothing can match
 
-            if found is not None:
-                best = found if best is None else best & found
-                if not best:
-                    return best
-
-        return best
+        if not found:
+            return None
+        # Only look at the keys in the smallest set (e.g. for {obj_id: x, ver: 0} that is the
+        # documents with that obj_id, not all of those that are version 0)
+        found.sort(key=len)
+        smallest, others = found[0], found[1:]
+        if not others:
+            return smallest
+        return {key for key in smallest if all(key in other for other in others)}
 
 
 def index_paths(index_dicts: Iterable[dict]) -> Set[str]:

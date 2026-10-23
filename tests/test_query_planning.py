@@ -187,6 +187,22 @@ def test_sqlite_existing_index_isnt_checked_on_reconnect(tmp_path, monkeypatch):
         coll.insert_one({"a": 3})
 
 
+def test_unique_index_with_a_common_value(database):
+    """Checking a unique index shouldn't take time proportional to the number of documents that
+    share one of its values (e.g. mincePy's (obj_id, ver), where most documents are version 0)"""
+    coll = database.coll
+    coll.create_index([("obj_id", pymongo.ASCENDING), ("ver", pymongo.ASCENDING)], unique=True)
+
+    start = time.perf_counter()
+    coll.insert_many([{"obj_id": idx, "ver": 0} for idx in range(30_000)])
+    # Copying all of the version 0 documents to check each insert takes minutes
+    assert time.perf_counter() - start < 20
+
+    with pytest.raises(pymongo.errors.DuplicateKeyError):
+        coll.insert_one({"obj_id": 7, "ver": 0})
+    coll.insert_one({"obj_id": 7, "ver": 1})
+
+
 def test_partial_unique_index(database):
     coll = database.coll
     # Documents without the field don't take part in a partial index...
